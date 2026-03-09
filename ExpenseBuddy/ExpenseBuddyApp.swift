@@ -30,6 +30,7 @@ struct ExpenseBuddyApp: App {
             ZStack {
                 if showSplash {
                     SplashView(showSplash: $showSplash)
+                        .environmentObject(authService)
                         .transition(.opacity)
                 } else if authService.isAuthenticated {
                     MainTabView()

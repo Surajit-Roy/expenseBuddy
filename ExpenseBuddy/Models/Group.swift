@@ -8,11 +8,10 @@ import Foundation
 struct ExpenseGroup: Identifiable, Codable, Hashable {
     let id: String
     var name: String
-    var members: [User]
-    var memberIds: [String] // Flat array for Firestore arrayContains queries
-    var memberEmails: [String] // Flat array for actual identity/privacy matching
-    var createdBy: User
+    var memberIds: [String] // Flat array of user IDs for Firestore arrayContains queries
+    var createdByUserId: String
     var createdAt: Date
+    var updatedAt: Date?
     var groupIcon: String // SF Symbol name
     var groupType: GroupType
     

@@ -243,17 +243,17 @@ struct CreateGroupView: View {
             return
         }
         
-        var members = [dataService.currentUser]
-        members.append(contentsOf: dataService.friends.filter { selectedFriendIds.contains($0.id) })
+        // Build memberIds: current user + selected friends
+        var memberIds = [dataService.currentUser.id]
+        memberIds.append(contentsOf: Array(selectedFriendIds))
         
         let group = ExpenseGroup(
             id: UUID().uuidString,
             name: trimmedName,
-            members: members,
-            memberIds: members.map { $0.id },
-            memberEmails: members.map { $0.email },
-            createdBy: dataService.currentUser,
+            memberIds: memberIds,
+            createdByUserId: dataService.currentUser.id,
             createdAt: Date(),
+            updatedAt: nil,
             groupIcon: selectedType.icon,
             groupType: selectedType
         )

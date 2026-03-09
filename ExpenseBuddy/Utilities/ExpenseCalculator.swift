@@ -40,28 +40,28 @@ struct ExpenseCalculator {
     
     /// Splits amount equally. The last participant absorbs any rounding remainder.
     /// e.g. ₹100 ÷ 3 → ₹33.33, ₹33.33, ₹33.34
-    static func calculateEqualSplit(amount: Double, participants: [User]) -> [ExpenseSplit] {
-        guard !participants.isEmpty else { return [] }
+    static func calculateEqualSplit(amount: Double, participantIds: [String]) -> [ExpenseSplit] {
+        guard !participantIds.isEmpty else { return [] }
         
-        let count = participants.count
+        let count = participantIds.count
         // Round each share DOWN to 2 decimal places
         let baseShare = (amount / Double(count) * 100).rounded(.down) / 100.0
         let totalDistributed = baseShare * Double(count)
         let remainder = ((amount - totalDistributed) * 100).rounded() / 100.0
         
-        return participants.enumerated().map { index, user in
+        return participantIds.enumerated().map { index, userId in
             let share = (index == count - 1) ? baseShare + remainder : baseShare
-            return ExpenseSplit(userId: user.id, userName: user.name, amountOwed: share)
+            return ExpenseSplit(userId: userId, amountOwed: share)
         }
     }
     
     // MARK: - Percentage Split
     
-    static func calculatePercentageSplit(amount: Double, participants: [User], percentages: [String: Double]) -> [ExpenseSplit] {
-        return participants.map { user in
-            let percentage = percentages[user.id] ?? 0
+    static func calculatePercentageSplit(amount: Double, participantIds: [String], percentages: [String: Double]) -> [ExpenseSplit] {
+        return participantIds.map { userId in
+            let percentage = percentages[userId] ?? 0
             let share = ((amount * percentage / 100.0) * 100).rounded() / 100.0
-            return ExpenseSplit(userId: user.id, userName: user.name, amountOwed: share)
+            return ExpenseSplit(userId: userId, amountOwed: share)
         }
     }
     
@@ -69,19 +69,15 @@ struct ExpenseCalculator {
     
     /// Compute net balance from A→B across all expenses and settlements.
     /// Returns the net amount that each pair owes (positive = fromUser owes toUser).
-    static func calculateBalances(expenses: [Expense], settlements: [Settlement], currentUserId: String) -> [BalanceEntry] {
+    static func calculateBalances(expenses: [Expense], settlements: [Settlement], currentUserId: String, userNames: [String: String] = [:]) -> [BalanceEntry] {
         // Track net: netOwed[A][B] > 0 means B owes A
         var netOwed: [String: [String: Double]] = [:]
-        var userNames: [String: String] = [:]
         
         // Process expenses: payer paid on behalf of participants
         for expense in expenses {
-            let payerId = expense.paidBy.id
-            userNames[payerId] = expense.paidBy.name
+            let payerId = expense.paidByUserId
             
             for split in expense.splits {
-                userNames[split.userId] = split.userName
-                
                 if split.userId != payerId {
                     // split.userId owes payerId the split amount
                     netOwed[payerId, default: [:]][split.userId, default: 0] += split.amountOwed
@@ -92,10 +88,8 @@ struct ExpenseCalculator {
         
         // Process settlements: fromUser paid toUser (reduces debt)
         for settlement in settlements {
-            let fromId = settlement.fromUser.id
-            let toId = settlement.toUser.id
-            userNames[fromId] = settlement.fromUser.name
-            userNames[toId] = settlement.toUser.name
+            let fromId = settlement.fromUserId
+            let toId = settlement.toUserId
             
             netOwed[toId, default: [:]][fromId, default: 0] -= settlement.amount
             netOwed[fromId, default: [:]][toId, default: 0] += settlement.amount
@@ -233,7 +227,7 @@ struct ExpenseCalculator {
         
         // From expenses
         for expense in expenses {
-            let payerId = expense.paidBy.id
+            let payerId = expense.paidByUserId
             for split in expense.splits {
                 if payerId == currentUserId && split.userId == friendId {
                     // Current user paid, friend owes their share → friend owes you
@@ -247,10 +241,10 @@ struct ExpenseCalculator {
         
         // From settlements
         for settlement in settlements {
-            if settlement.fromUser.id == friendId && settlement.toUser.id == currentUserId {
+            if settlement.fromUserId == friendId && settlement.toUserId == currentUserId {
                 // Friend paid you → reduces what they owe
                 net -= settlement.amount
-            } else if settlement.fromUser.id == currentUserId && settlement.toUser.id == friendId {
+            } else if settlement.fromUserId == currentUserId && settlement.toUserId == friendId {
                 // You paid friend → reduces what you owe
                 net += settlement.amount
             }
@@ -272,12 +266,12 @@ struct ExpenseCalculator {
     
     // MARK: - Per-User Balances
     
-    static func userBalances(expenses: [Expense], settlements: [Settlement], users: [User], currentUserId: String) -> [UserBalance] {
-        return users.compactMap { user in
-            guard user.id != currentUserId else { return nil }
-            let net = balanceBetween(currentUserId: currentUserId, friendId: user.id, expenses: expenses, settlements: settlements)
+    static func userBalances(expenses: [Expense], settlements: [Settlement], userIds: [String], currentUserId: String, userNames: [String: String] = [:]) -> [UserBalance] {
+        return userIds.compactMap { userId in
+            guard userId != currentUserId else { return nil }
+            let net = balanceBetween(currentUserId: currentUserId, friendId: userId, expenses: expenses, settlements: settlements)
             guard abs(net) > 0.01 else { return nil }
-            return UserBalance(userId: user.id, userName: user.name, totalBalance: net)
+            return UserBalance(userId: userId, userName: userNames[userId] ?? "", totalBalance: net)
         }
     }
 }

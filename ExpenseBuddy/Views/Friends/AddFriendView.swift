@@ -178,11 +178,14 @@ struct AddFriendView: View {
             createdAt: Date()
         )
         
-        dataService.addFriend(friend)
-        
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
-        
-        showSuccess = true
+        Task {
+            await dataService.addFriend(name: trimmedName, email: trimmedEmail)
+            
+            await MainActor.run {
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+                showSuccess = true
+            }
+        }
     }
 }

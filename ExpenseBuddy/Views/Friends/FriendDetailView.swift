@@ -67,7 +67,7 @@ struct FriendDetailView: View {
             }
         }
         .sheet(isPresented: $showSettleUp) {
-            SettleUpView(groupId: nil, members: [dataService.currentUser, friend])
+            SettleUpView(groupId: nil, memberIds: [dataService.currentUser.id, friend.id])
         }
         .alert("Remove Friend", isPresented: $showRemoveAlert) {
             if dataService.canDeleteFriend(friend.id) {

@@ -4,7 +4,6 @@
 //
 
 import Foundation
-import FirebaseFirestore
 
 struct ActivityItem: Identifiable, Codable {
     let id: String
@@ -13,7 +12,7 @@ struct ActivityItem: Identifiable, Codable {
     let subtitle: String
     let amount: Double?
     let date: Date
-    let involvedUsers: [User]
+    let involvedUserIds: [String]
     let groupName: String?
     let relatedExpenseId: String?
 }

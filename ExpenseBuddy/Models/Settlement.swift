@@ -7,11 +7,12 @@ import Foundation
 
 struct Settlement: Identifiable, Codable {
     let id: String
-    let fromUser: User
-    let toUser: User
+    var fromUserId: String
+    var toUserId: String
     var amount: Double
     var date: Date
-    var participantEmails: [String]? // Flat array for privacy matching
+    var participantIds: [String] // [fromUserId, toUserId] for Firestore arrayContains queries
     var groupId: String?
     var note: String?
+    var createdByUserId: String
 }

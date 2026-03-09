@@ -92,6 +92,7 @@ struct BalanceAmountView: View {
 struct ExpenseRow: View {
     let expense: Expense
     let currentUserId: String
+    @EnvironmentObject var dataService: DataService
     @EnvironmentObject var currencyManager: CurrencyManager
     
     private var userSplit: Double {
@@ -99,7 +100,7 @@ struct ExpenseRow: View {
     }
     
     private var isCurrentUserPayer: Bool {
-        expense.paidBy.id == currentUserId
+        expense.paidByUserId == currentUserId
     }
     
     private var balanceAmount: Double {
@@ -108,6 +109,10 @@ struct ExpenseRow: View {
         } else {
             return -userSplit
         }
+    }
+    
+    private var payerName: String {
+        dataService.userCache.name(for: expense.paidByUserId)
     }
     
     var body: some View {
@@ -131,7 +136,7 @@ struct ExpenseRow: View {
                     .lineLimit(1)
                 
                 HStack(spacing: 4) {
-                    Text(expense.paidBy.name)
+                    Text(payerName)
                         .font(AppFonts.caption())
                         .foregroundColor(AppColors.textSecondary)
                     Text("paid")

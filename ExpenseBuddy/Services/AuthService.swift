@@ -15,6 +15,7 @@ class AuthService: ObservableObject {
     @Published var currentUser: User?
     @Published var isAuthenticated = false
     @Published var isLoading = false
+    @Published var isInitialCheckDone = false
     @Published var errorMessage: String?
     
     private let db = Firestore.firestore()
@@ -25,10 +26,12 @@ class AuthService: ObservableObject {
             if let user = user {
                 Task {
                     await self.fetchUserDocument(uid: user.uid)
+                    self.isInitialCheckDone = true
                 }
             } else {
                 self.currentUser = nil
                 self.isAuthenticated = false
+                self.isInitialCheckDone = true
             }
         }
     }

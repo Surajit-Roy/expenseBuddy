@@ -17,18 +17,34 @@ class DataService: ObservableObject {
     @Published var activities: [ActivityItem] = []
     @Published var currentUser: User = User(id: "", name: "", email: "", profileImage: "", createdAt: Date())
     
+    let userCache = UserCache()
+    
     private let db = Firestore.firestore()
     private var listeners: [ListenerRegistration] = []
+    private var cancellables = Set<AnyCancellable>()
     
     init() {
+        // Re-render activity feed whenever UserCache updates (names arrive)
+        userCache.$cache
+            .dropFirst()
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.rebuildActivityFeed()
+            }
+            .store(in: &cancellables)
+        
         Auth.auth().addStateDidChangeListener { [weak self] auth, user in
             guard let self = self else { return }
             if let user = user {
                 // Remove old listeners
                 self.stopListeners()
                 
-                // We'll set a temporary current user ID, but we expect AuthService to manage the main profile details
+                // Set current user identity
                 self.currentUser.id = user.uid
+                self.currentUser.email = user.email ?? ""
+                
+                // Seed cache with current user
+                self.userCache.seed(self.currentUser)
                 
                 // Start tracking data
                 self.setupListeners(userId: user.uid)
@@ -62,55 +78,88 @@ class DataService: ObservableObject {
     // MARK: - Firestore Sync (Listeners)
     
     private func setupListeners(userId: String) {
-        let userEmail = currentUser.email
-        
-        // 1. Listen to Groups where user is a member (uses flat memberEmails array)
+        // 1. Listen to Groups where user is a member (uses flat memberIds array)
         let groupsListener = db.collection("groups")
-            .whereField("memberEmails", arrayContains: userEmail)
+            .whereField("memberIds", arrayContains: userId)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self, let documents = snapshot?.documents else {
                     if let error = error { print("Groups listener error: \(error)") }
                     return
                 }
                 self.groups = documents.compactMap { try? $0.data(as: ExpenseGroup.self) }
+                self.resolveUserIds()
                 self.rebuildActivityFeed()
             }
             
-        // 2. Listen to Expenses where user is a participant (uses flat participantEmails array)
+        // 2. Listen to Expenses where user is a participant (uses flat participantIds array)
         let expensesListener = db.collection("expenses")
-            .whereField("participantEmails", arrayContains: userEmail)
+            .whereField("participantIds", arrayContains: userId)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self, let documents = snapshot?.documents else {
                     if let error = error { print("Expenses listener error: \(error)") }
                     return
                 }
                 self.expenses = documents.compactMap { try? $0.data(as: Expense.self) }
+                self.resolveUserIds()
                 self.rebuildActivityFeed()
             }
             
-        // 3. Listen to Settlements where user is a participant (uses flat participantEmails array)
+        // 3. Listen to Settlements where user is a participant (uses flat participantIds array)
         let settlementsListener = db.collection("settlements")
-            .whereField("participantEmails", arrayContains: userEmail)
+            .whereField("participantIds", arrayContains: userId)
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self, let documents = snapshot?.documents else {
                     if let error = error { print("Settlements listener error: \(error)") }
                     return
                 }
                 self.settlements = documents.compactMap { try? $0.data(as: Settlement.self) }
+                self.resolveUserIds()
                 self.rebuildActivityFeed()
             }
             
         // 4. Friends list — private subcollection for the current user
-        let usersListener = db.collection("users").document(userId).collection("friends")
+        let friendsListener = db.collection("users").document(userId).collection("friends")
             .addSnapshotListener { [weak self] snapshot, error in
                 guard let self = self, let documents = snapshot?.documents else {
-                    if let error = error { print("Users listener error: \(error)") }
+                    if let error = error { print("Friends listener error: \(error)") }
                     return
                 }
                 self.friends = documents.compactMap { try? $0.data(as: User.self) }
+                // Seed cache with all friends
+                self.userCache.seed(self.friends)
+                self.rebuildActivityFeed()
             }
             
-        listeners.append(contentsOf: [groupsListener, expensesListener, settlementsListener, usersListener])
+        listeners.append(contentsOf: [groupsListener, expensesListener, settlementsListener, friendsListener])
+    }
+    
+    // MARK: - User ID Resolution
+    
+    /// Collects all user IDs referenced in groups, expenses, and settlements,
+    /// and asks UserCache to fetch any that aren't already cached.
+    private func resolveUserIds() {
+        var allIds = Set<String>()
+        
+        for group in groups {
+            allIds.formUnion(group.memberIds)
+            allIds.insert(group.createdByUserId)
+        }
+        
+        for expense in expenses {
+            allIds.insert(expense.paidByUserId)
+            allIds.formUnion(expense.participantIds)
+            allIds.insert(expense.createdByUserId)
+            for split in expense.splits {
+                allIds.insert(split.userId)
+            }
+        }
+        
+        for settlement in settlements {
+            allIds.insert(settlement.fromUserId)
+            allIds.insert(settlement.toUserId)
+        }
+        
+        userCache.fetchIfNeeded(ids: Array(allIds))
     }
     
     // MARK: - Activity Feed
@@ -119,33 +168,37 @@ class DataService: ObservableObject {
         var items: [ActivityItem] = []
         
         for expense in expenses {
+            let payerName = userCache.name(for: expense.paidByUserId)
             items.append(ActivityItem(
                 id: "act_\(expense.id)", type: .expenseAdded, title: expense.title,
-                subtitle: "\(expense.paidBy.name) paid \(CurrencyManager.shared.format(expense.amount))",
+                subtitle: "\(payerName) paid \(CurrencyManager.shared.format(expense.amount))",
                 amount: expense.amount, date: expense.createdAt,
-                involvedUsers: expense.participants,
+                involvedUserIds: expense.participantIds,
                 groupName: groupName(for: expense.groupId),
                 relatedExpenseId: expense.id
             ))
         }
         
         for settlement in settlements {
+            let fromName = userCache.name(for: settlement.fromUserId)
+            let toName = userCache.name(for: settlement.toUserId)
             items.append(ActivityItem(
                 id: "act_\(settlement.id)", type: .settlement, title: "Settlement",
-                subtitle: "\(settlement.fromUser.name) paid \(settlement.toUser.name) \(CurrencyManager.shared.format(settlement.amount))",
+                subtitle: "\(fromName) paid \(toName) \(CurrencyManager.shared.format(settlement.amount))",
                 amount: settlement.amount, date: settlement.date,
-                involvedUsers: [settlement.fromUser, settlement.toUser],
+                involvedUserIds: settlement.participantIds,
                 groupName: groupName(for: settlement.groupId),
                 relatedExpenseId: nil
             ))
         }
         
         for group in groups {
+            let creatorName = userCache.name(for: group.createdByUserId)
             items.append(ActivityItem(
                 id: "act_group_\(group.id)", type: .groupCreated, title: "Group Created",
-                subtitle: "\(group.createdBy.name) created \"\(group.name)\"",
+                subtitle: "\(creatorName) created \"\(group.name)\"",
                 amount: nil, date: group.createdAt,
-                involvedUsers: group.members, groupName: group.name,
+                involvedUserIds: group.memberIds, groupName: group.name,
                 relatedExpenseId: nil
             ))
         }
@@ -184,18 +237,19 @@ class DataService: ObservableObject {
     
     /// Records a settlement. If `groupId` is nil (global settlement), it automatically distributes the payment
     /// across shared groups where the `fromUser` owes the `toUser`.
-    func recordSettlement(from fromUser: User, to toUser: User, amount: Double, groupId: String?, note: String?) {
+    func recordSettlement(fromUserId: String, toUserId: String, amount: Double, groupId: String?, note: String?) {
         if let groupId = groupId {
             // Explicit group settlement
             let settlement = Settlement(
                 id: UUID().uuidString,
-                fromUser: fromUser,
-                toUser: toUser,
+                fromUserId: fromUserId,
+                toUserId: toUserId,
                 amount: amount,
                 date: Date(),
-                participantEmails: [fromUser.email, toUser.email],
+                participantIds: [fromUserId, toUserId],
                 groupId: groupId,
-                note: note
+                note: note,
+                createdByUserId: currentUser.id
             )
             addSettlement(settlement)
             return
@@ -203,7 +257,7 @@ class DataService: ObservableObject {
         
         // Global settlement (groupId == nil), distribute across shared groups
         var remainingAmount = amount
-        let shared = sharedGroups(with: toUser.id).filter { $0.members.contains(where: { $0.id == fromUser.id }) }
+        let shared = sharedGroups(with: toUserId).filter { $0.memberIds.contains(fromUserId) }
         
         for group in shared {
             if remainingAmount <= 0.01 { break }
@@ -211,12 +265,9 @@ class DataService: ObservableObject {
             let groupExpenses = expensesForGroup(group.id)
             let groupSettlements = settlementsForGroup(group.id)
             
-            // balanceBetween returns positive if friend owes current user.
-            // Here, we want to know if fromUser owes toUser.
-            // If we check from fromUser's perspective, towards toUser:
             let balance = ExpenseCalculator.balanceBetween(
-                currentUserId: fromUser.id,
-                friendId: toUser.id,
+                currentUserId: fromUserId,
+                friendId: toUserId,
                 expenses: groupExpenses,
                 settlements: groupSettlements
             )
@@ -228,30 +279,32 @@ class DataService: ObservableObject {
                 
                 let settlement = Settlement(
                     id: UUID().uuidString,
-                    fromUser: fromUser,
-                    toUser: toUser,
+                    fromUserId: fromUserId,
+                    toUserId: toUserId,
                     amount: settlementAmount,
                     date: Date(),
-                    participantEmails: [fromUser.email, toUser.email],
+                    participantIds: [fromUserId, toUserId],
                     groupId: group.id,
-                    note: note
+                    note: note,
+                    createdByUserId: currentUser.id
                 )
                 addSettlement(settlement)
                 remainingAmount -= settlementAmount
             }
         }
         
-        // If there's any amount left over, apply it globally (non-group expense settlement, or overpayment)
+        // If there's any amount left over, apply it globally
         if remainingAmount > 0.01 {
             let leftover = Settlement(
                 id: UUID().uuidString,
-                fromUser: fromUser,
-                toUser: toUser,
+                fromUserId: fromUserId,
+                toUserId: toUserId,
                 amount: remainingAmount,
                 date: Date(),
-                participantEmails: [fromUser.email, toUser.email],
+                participantIds: [fromUserId, toUserId],
                 groupId: nil,
-                note: note
+                note: note,
+                createdByUserId: currentUser.id
             )
             addSettlement(leftover)
         }
@@ -274,8 +327,8 @@ class DataService: ObservableObject {
         for exp in expenses where exp.groupId == groupId {
             deleteExpense(exp.id)
         }
-        for set in settlements where set.groupId == groupId {
-            db.collection("settlements").document(set.id).delete()
+        for sett in settlements where sett.groupId == groupId {
+            db.collection("settlements").document(sett.id).delete()
         }
     }
     
@@ -294,10 +347,61 @@ class DataService: ObservableObject {
     
     // MARK: - Friend CRUD
     
-    func addFriend(_ friend: User) {
-        // Write friend to the private subcollection so only the current user sees them
+    /// Searches for an existing user by their email address.
+    func findUserByEmail(_ email: String) async -> User? {
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         do {
-            try db.collection("users").document(currentUser.id).collection("friends").document(friend.id).setData(from: friend)
+            let snapshot = try await db.collection("users")
+                .whereField("email", isEqualTo: trimmedEmail)
+                .limit(to: 1)
+                .getDocuments()
+            
+            if let doc = snapshot.documents.first {
+                return try doc.data(as: User.self)
+            }
+        } catch {
+            print("Error finding user by email: \(error)")
+        }
+        return nil
+    }
+    
+    /// Adds a friend. If the user exists in ExpenseBuddy, it performs a bidirectional add.
+    func addFriend(name: String, email: String) async {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        
+        // 1. Try to find existing user
+        let existingUser = await findUserByEmail(trimmedEmail)
+        
+        let friendId = existingUser?.id ?? UUID().uuidString
+        let friend = User(
+            id: friendId,
+            name: existingUser?.name ?? trimmedName,
+            email: trimmedEmail,
+            profileImage: existingUser?.profileImage ?? "person.circle.fill",
+            createdAt: existingUser?.createdAt ?? Date()
+        )
+        
+        do {
+            // 2. Add to current user's friends list
+            try db.collection("users").document(currentUser.id)
+                .collection("friends").document(friend.id)
+                .setData(from: friend)
+            
+            // 3. If user exists, add current user to THEIR friends list (Bidirectional)
+            if let _ = existingUser {
+                // We need the current user's full profile to add to the friend's list
+                // Fetch current user from main collection to be safe
+                let meSnapshot = try await db.collection("users").document(currentUser.id).getDocument()
+                if let me = try? meSnapshot.data(as: User.self) {
+                    try await db.collection("users").document(friend.id)
+                        .collection("friends").document(me.id)
+                        .setData(from: me)
+                }
+            }
+            
+            // Seed cache immediately
+            userCache.seed(friend)
         } catch {
             print("Failed to add friend: \(error)")
         }
@@ -324,17 +428,17 @@ class DataService: ObservableObject {
     
     func expensesWithFriend(_ friendId: String) -> [Expense] {
         expenses.filter { expense in
-            expense.participants.contains { $0.id == friendId }
+            expense.participantIds.contains(friendId)
         }.sorted { $0.createdAt > $1.createdAt }
     }
     
     func settlementsWithFriend(_ friendId: String) -> [Settlement] {
-        settlements.filter { $0.fromUser.id == friendId || $0.toUser.id == friendId }
+        settlements.filter { $0.fromUserId == friendId || $0.toUserId == friendId }
     }
     
     func sharedGroups(with friendId: String) -> [ExpenseGroup] {
         groups.filter { group in
-            group.members.contains { $0.id == friendId }
+            group.memberIds.contains(friendId)
         }
     }
     
@@ -348,29 +452,24 @@ class DataService: ObservableObject {
     }
     
     func overallBalance() -> Double {
-        // Compute net balance across ALL users (not just friends list)
         var net: Double = 0
         let uid = currentUser.id
         
         for expense in expenses {
-            let payerId = expense.paidBy.id
+            let payerId = expense.paidByUserId
             for split in expense.splits {
                 if payerId == uid && split.userId != uid {
-                    // I paid, someone else owes their share → they owe me
                     net += split.amountOwed
                 } else if payerId != uid && split.userId == uid {
-                    // Someone else paid, I owe my share → I owe them
                     net -= split.amountOwed
                 }
             }
         }
         
         for settlement in settlements {
-            if settlement.fromUser.id == uid {
-                // I paid someone → reduces what I owe (increases my net)
+            if settlement.fromUserId == uid {
                 net += settlement.amount
-            } else if settlement.toUser.id == uid {
-                // Someone paid me → reduces what they owe (decreases my net)
+            } else if settlement.toUserId == uid {
                 net -= settlement.amount
             }
         }
@@ -381,9 +480,10 @@ class DataService: ObservableObject {
     func groupBalance(_ group: ExpenseGroup) -> Double {
         let groupExpenses = expensesForGroup(group.id)
         let groupSettlements = settlementsForGroup(group.id)
+        let userNames = buildUserNames(for: group.memberIds)
         let balances = ExpenseCalculator.calculateBalances(
             expenses: groupExpenses, settlements: groupSettlements,
-            currentUserId: currentUser.id
+            currentUserId: currentUser.id, userNames: userNames
         )
         return ExpenseCalculator.totalBalance(for: currentUser.id, balances: balances)
     }
@@ -391,16 +491,17 @@ class DataService: ObservableObject {
     func groupBalanceEntries(_ group: ExpenseGroup) -> [BalanceEntry] {
         let groupExpenses = expensesForGroup(group.id)
         let groupSettlements = settlementsForGroup(group.id)
+        let userNames = buildUserNames(for: group.memberIds)
         return ExpenseCalculator.calculateBalances(
             expenses: groupExpenses, settlements: groupSettlements,
-            currentUserId: currentUser.id
+            currentUserId: currentUser.id, userNames: userNames
         )
     }
     
     /// Simplified debts for a group — minimum number of transactions
     func simplifiedGroupDebts(_ group: ExpenseGroup) -> [SimplifiedDebt] {
         let balances = groupBalanceEntries(group)
-        let userNames = Dictionary(group.members.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        let userNames = buildUserNames(for: group.memberIds)
         return ExpenseCalculator.simplifyDebts(balances: balances, userNames: userNames)
     }
     
@@ -412,6 +513,17 @@ class DataService: ObservableObject {
             expenses: expenses,
             settlements: settlements
         )
+    }
+    
+    // MARK: - User Name Resolution Helper
+    
+    /// Builds a [userId: displayName] dictionary from the UserCache for a set of IDs.
+    func buildUserNames(for ids: [String]) -> [String: String] {
+        var names: [String: String] = [:]
+        for id in ids {
+            names[id] = userCache.name(for: id)
+        }
+        return names
     }
     
     // MARK: - Activity Grouping

@@ -20,6 +20,11 @@ struct GroupDetailView: View {
         dataService.groups.first { $0.id == groupId }
     }
     
+    private var groupMembers: [User] {
+        guard let group else { return [] }
+        return dataService.userCache.users(for: group.memberIds)
+    }
+    
     private var groupExpenses: [Expense] {
         dataService.expensesForGroup(groupId)
     }
@@ -95,7 +100,7 @@ struct GroupDetailView: View {
                 AddExpenseView(groupId: group.id)
             }
             .sheet(isPresented: $showSettleUp) {
-                SettleUpView(groupId: group.id, members: group.members)
+                SettleUpView(groupId: group.id, memberIds: group.memberIds)
             }
             .alert("Delete Group", isPresented: $showDeleteGroupAlert) {
                 if dataService.canDeleteGroup(group) {
@@ -136,7 +141,7 @@ struct GroupDetailView: View {
                 .font(AppFonts.title2())
                 .foregroundColor(AppColors.textPrimary)
             HStack(spacing: 16) {
-                Label("\(group.members.count) members", systemImage: "person.2.fill")
+                Label("\(group.memberIds.count) members", systemImage: "person.2.fill")
                 Label("\(groupExpenses.count) expenses", systemImage: "receipt")
             }
             .font(AppFonts.caption())
@@ -155,18 +160,21 @@ struct GroupDetailView: View {
             
             VStack(spacing: 8) {
                 ForEach(balanceEntries) { entry in
+                    let fromName = entry.fromUserName.isEmpty ? dataService.userCache.name(for: entry.fromUserId) : entry.fromUserName
+                    let toName = entry.toUserName.isEmpty ? dataService.userCache.name(for: entry.toUserId) : entry.toUserName
+                    
                     HStack(spacing: 12) {
-                        AvatarView(name: entry.fromUserName, size: 36)
+                        AvatarView(name: fromName, size: 36)
                         
                         HStack(spacing: 4) {
-                            Text(entry.fromUserName.components(separatedBy: " ").first ?? "")
+                            Text(fromName.components(separatedBy: " ").first ?? "")
                                 .font(AppFonts.subheadline())
                                 .fontWeight(.medium)
                                 .foregroundColor(AppColors.textPrimary)
                             Image(systemName: "arrow.right")
                                 .font(.caption2)
                                 .foregroundColor(AppColors.textTertiary)
-                            Text(entry.toUserName.components(separatedBy: " ").first ?? "")
+                            Text(toName.components(separatedBy: " ").first ?? "")
                                 .font(AppFonts.subheadline())
                                 .fontWeight(.medium)
                                 .foregroundColor(AppColors.textPrimary)
@@ -211,17 +219,20 @@ struct GroupDetailView: View {
             
             VStack(spacing: 0) {
                 ForEach(simplifiedDebts) { debt in
+                    let fromName = debt.fromUserName.isEmpty ? dataService.userCache.name(for: debt.fromUserId) : debt.fromUserName
+                    let toName = debt.toUserName.isEmpty ? dataService.userCache.name(for: debt.toUserId) : debt.toUserName
+                    
                     HStack(spacing: 12) {
-                        AvatarView(name: debt.fromUserName, size: 36)
+                        AvatarView(name: fromName, size: 36)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 4) {
-                                Text(debt.fromUserName.components(separatedBy: " ").first ?? "")
+                                Text(fromName.components(separatedBy: " ").first ?? "")
                                     .fontWeight(.medium)
                                 Image(systemName: "arrow.right")
                                     .font(.caption2)
                                     .foregroundColor(AppColors.textTertiary)
-                                Text(debt.toUserName.components(separatedBy: " ").first ?? "")
+                                Text(toName.components(separatedBy: " ").first ?? "")
                                     .fontWeight(.medium)
                             }
                             .font(AppFonts.subheadline())
@@ -256,14 +267,15 @@ struct GroupDetailView: View {
     
     private func membersSection(_ group: ExpenseGroup) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Members (\(group.members.count))")
+            Text("Members (\(group.memberIds.count))")
                 .font(AppFonts.headline())
                 .foregroundColor(AppColors.textPrimary)
                 .padding(.horizontal, 20)
             
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
-                    ForEach(group.members) { member in
+                    ForEach(group.memberIds, id: \.self) { memberId in
+                        let member = dataService.userCache.userOrPlaceholder(for: memberId)
                         VStack(spacing: 6) {
                             AvatarView(name: member.name, size: 50)
                             Text(member.name.components(separatedBy: " ").first ?? "")

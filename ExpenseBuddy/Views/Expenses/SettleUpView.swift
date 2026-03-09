@@ -10,7 +10,7 @@ struct SettleUpView: View {
     @EnvironmentObject var dataService: DataService
     @EnvironmentObject var currencyManager: CurrencyManager
     let groupId: String?
-    let members: [User]
+    let memberIds: [String]
     @Environment(\.dismiss) private var dismiss
     
     @State private var selectedUserId: String = ""
@@ -20,7 +20,9 @@ struct SettleUpView: View {
     @State private var errorMessage: String?
     
     private var otherMembers: [User] {
-        members.filter { $0.id != dataService.currentUser.id }
+        memberIds
+            .filter { $0 != dataService.currentUser.id }
+            .map { dataService.userCache.userOrPlaceholder(for: $0) }
     }
     
     private var amount: Double {
@@ -289,7 +291,7 @@ struct SettleUpView: View {
     private func settleUp() {
         errorMessage = nil
         
-        guard let otherUser = members.first(where: { $0.id == selectedUserId }) else {
+        guard !selectedUserId.isEmpty else {
             errorMessage = "Please select a person."
             return
         }
@@ -309,24 +311,23 @@ struct SettleUpView: View {
         // Determine the correct direction:
         // If balance < 0 (I owe them): fromUser = me, toUser = them (I pay them)
         // If balance > 0 (they owe me): fromUser = them, toUser = me (they pay me)
-        // If balance == 0: treat as current user paying (shouldn't normally happen)
-        let fromUser: User
-        let toUser: User
+        let fromUserId: String
+        let toUserId: String
         
         if balance < -0.01 {
             // I owe them → I pay them
-            fromUser = dataService.currentUser
-            toUser = otherUser
+            fromUserId = dataService.currentUser.id
+            toUserId = selectedUserId
         } else {
             // They owe me → they pay me
-            fromUser = otherUser
-            toUser = dataService.currentUser
+            fromUserId = selectedUserId
+            toUserId = dataService.currentUser.id
         }
         
         // Convert the input amount back to INR before saving
         dataService.recordSettlement(
-            from: fromUser,
-            to: toUser,
+            fromUserId: fromUserId,
+            toUserId: toUserId,
             amount: currencyManager.convertToINR(amount),
             groupId: groupId,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines)

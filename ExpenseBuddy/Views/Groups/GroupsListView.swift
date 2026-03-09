@@ -132,7 +132,7 @@ struct GroupCard: View {
                     Image(systemName: "person.2.fill")
                         .font(.system(size: 10))
                         .foregroundColor(AppColors.textTertiary)
-                    Text("\(group.members.count) members")
+                    Text("\(group.memberIds.count) members")
                         .font(AppFonts.caption())
                         .foregroundColor(AppColors.textSecondary)
                 }

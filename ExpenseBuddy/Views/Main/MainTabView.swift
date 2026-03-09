@@ -37,11 +37,13 @@ struct MainTabView: View {
         .onAppear {
             if let user = authService.currentUser {
                 dataService.currentUser = user
+                dataService.userCache.seed(user)
             }
         }
         .onChange(of: authService.currentUser) { _, newUser in
             if let user = newUser {
                 dataService.currentUser = user
+                dataService.userCache.seed(user)
             }
         }
     }

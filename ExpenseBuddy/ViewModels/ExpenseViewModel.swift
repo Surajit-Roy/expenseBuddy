@@ -29,6 +29,7 @@ class ExpenseViewModel: ObservableObject {
     @Published var groupId: String?
     
     var dataService: DataService?
+    /// Available members as User objects (for display). Resolved from UserCache.
     var availableMembers: [User] = []
     
     init(groupId: String? = nil) {
@@ -40,8 +41,16 @@ class ExpenseViewModel: ObservableObject {
         self.paidByUserId = dataService.currentUser.id
         
         if let groupId, let group = dataService.groups.first(where: { $0.id == groupId }) {
-            availableMembers = group.members
-            selectedParticipantIds = Set(group.members.map { $0.id })
+            // Resolve member IDs to User objects for display
+            availableMembers = group.memberIds.compactMap { dataService.userCache.user(for: $0) }
+            // If some members aren't cached yet, include placeholders
+            if availableMembers.count < group.memberIds.count {
+                let cachedIds = Set(availableMembers.map { $0.id })
+                for id in group.memberIds where !cachedIds.contains(id) {
+                    availableMembers.append(dataService.userCache.userOrPlaceholder(for: id))
+                }
+            }
+            selectedParticipantIds = Set(group.memberIds)
         } else {
             var members = [dataService.currentUser]
             members.append(contentsOf: dataService.friends)
@@ -106,21 +115,21 @@ class ExpenseViewModel: ObservableObject {
     // MARK: - Split Calculation
     
     func calculateSplits() -> [ExpenseSplit] {
-        let participants = selectedParticipants
+        let participantIdsList = Array(selectedParticipantIds)
         
         switch splitType {
         case .equal:
-            return ExpenseCalculator.calculateEqualSplit(amount: amount, participants: participants)
+            return ExpenseCalculator.calculateEqualSplit(amount: amount, participantIds: participantIdsList)
         case .unequal, .exact:
-            return participants.map { user in
-                let amt = Double(unequalAmounts[user.id] ?? "0") ?? 0
-                return ExpenseSplit(userId: user.id, userName: user.name, amountOwed: ((amt * 100).rounded() / 100.0))
+            return participantIdsList.map { userId in
+                let amt = Double(unequalAmounts[userId] ?? "0") ?? 0
+                return ExpenseSplit(userId: userId, amountOwed: ((amt * 100).rounded() / 100.0))
             }
         case .percentage:
-            let percentageValues = participants.reduce(into: [String: Double]()) { result, user in
-                result[user.id] = Double(percentages[user.id] ?? "0") ?? 0
+            let percentageValues = participantIdsList.reduce(into: [String: Double]()) { result, userId in
+                result[userId] = Double(percentages[userId] ?? "0") ?? 0
             }
-            return ExpenseCalculator.calculatePercentageSplit(amount: amount, participants: participants, percentages: percentageValues)
+            return ExpenseCalculator.calculatePercentageSplit(amount: amount, participantIds: participantIdsList, percentages: percentageValues)
         }
     }
     
@@ -129,13 +138,13 @@ class ExpenseViewModel: ObservableObject {
         case .equal:
             return true
         case .unequal, .exact:
-            let total = selectedParticipants.reduce(0.0) { sum, user in
-                sum + (Double(unequalAmounts[user.id] ?? "0") ?? 0)
+            let total = selectedParticipantIds.reduce(0.0) { sum, userId in
+                sum + (Double(unequalAmounts[userId] ?? "0") ?? 0)
             }
             return abs(total - amount) < 0.01
         case .percentage:
-            let total = selectedParticipants.reduce(0.0) { sum, user in
-                sum + (Double(percentages[user.id] ?? "0") ?? 0)
+            let total = selectedParticipantIds.reduce(0.0) { sum, userId in
+                sum + (Double(percentages[userId] ?? "0") ?? 0)
             }
             return abs(total - 100) < 0.01
         }
@@ -194,38 +203,30 @@ class ExpenseViewModel: ObservableObject {
         
         let splits = calculateSplits()
         
-        // The `amount` property contains the user's input in their selected currency.
-        // We MUST convert it and all calculated splits back to INR (base currency) before saving.
+        // Convert amount and splits to INR (base currency) before saving
         let inrAmount = CurrencyManager.shared.convertToINR(amount)
         
         let inrSplits = splits.map { split in
             ExpenseSplit(
                 userId: split.userId,
-                userName: split.userName,
                 amountOwed: CurrencyManager.shared.convertToINR(split.amountOwed)
             )
-        }
-        
-        // Final safety: verify splits sum matches total *after* conversion
-        let inrSplitsTotal = inrSplits.reduce(0.0) { $0 + $1.amountOwed }
-        if abs(inrSplitsTotal - inrAmount) > 0.05 {
-            // Recalculate or log due to minor rounding differences after conversion
         }
         
         let expense = Expense(
             id: UUID().uuidString,
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
             amount: inrAmount,
-            paidBy: paidByUser,
-            participants: selectedParticipants,
-            participantIds: selectedParticipants.map { $0.id },
-            participantEmails: selectedParticipants.map { $0.email },
+            paidByUserId: paidByUserId,
+            participantIds: Array(selectedParticipantIds),
             splitType: splitType,
             splits: inrSplits,
             groupId: groupId,
             category: selectedCategory,
             note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines),
-            createdAt: Date()
+            createdByUserId: dataService.currentUser.id,
+            createdAt: Date(),
+            updatedAt: nil
         )
         
         dataService.addExpense(expense)

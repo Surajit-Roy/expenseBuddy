@@ -28,17 +28,3 @@ struct User: Identifiable, Codable, Hashable {
         hasher.combine(id)
     }
 }
-
-enum FriendRequestStatus: String, Codable {
-    case pending
-    case accepted
-    case rejected
-}
-
-struct FriendRequest: Identifiable, Codable {
-    let id: String
-    let fromUser: User
-    let toUser: User
-    var status: FriendRequestStatus
-    let createdAt: Date
-}

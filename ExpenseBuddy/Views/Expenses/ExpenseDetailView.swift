@@ -14,6 +14,10 @@ struct ExpenseDetailView: View {
     @State private var showDeleteAlert = false
     @Environment(\.dismiss) private var dismiss
     
+    private var payerName: String {
+        dataService.userCache.name(for: expense.paidByUserId)
+    }
+    
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -70,9 +74,9 @@ struct ExpenseDetailView: View {
     
     private var detailsCard: some View {
         VStack(spacing: 0) {
-            detailRow(icon: "person.fill", label: "Paid by", value: expense.paidBy.name)
+            detailRow(icon: "person.fill", label: "Paid by", value: payerName)
             Divider().padding(.leading, 52)
-            detailRow(icon: "person.2.fill", label: "Split between", value: "\(expense.participants.count) people")
+            detailRow(icon: "person.2.fill", label: "Split between", value: "\(expense.participantIds.count) people")
             Divider().padding(.leading, 52)
             detailRow(icon: "equal.circle", label: "Split type", value: expense.splitType.rawValue)
             Divider().padding(.leading, 52)
@@ -117,15 +121,17 @@ struct ExpenseDetailView: View {
             
             VStack(spacing: 0) {
                 ForEach(expense.splits) { split in
+                    let splitUserName = dataService.userCache.name(for: split.userId)
+                    
                     HStack(spacing: 14) {
-                        AvatarView(name: split.userName, size: 40)
+                        AvatarView(name: splitUserName, size: 40)
                         
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(split.userName)
+                            Text(splitUserName)
                                 .font(AppFonts.subheadline())
                                 .fontWeight(.medium)
                                 .foregroundColor(AppColors.textPrimary)
-                            if split.userId == expense.paidBy.id {
+                            if split.userId == expense.paidByUserId {
                                 Text("Paid \(currencyManager.format(expense.amount))")
                                     .font(AppFonts.caption())
                                     .foregroundColor(AppColors.owedGreen)
@@ -138,8 +144,8 @@ struct ExpenseDetailView: View {
                             Text(currencyManager.format(split.amountOwed))
                                 .font(AppFonts.subheadline())
                                 .fontWeight(.bold)
-                                .foregroundColor(split.userId == expense.paidBy.id ? AppColors.owedGreen : AppColors.oweRed)
-                            Text(split.userId == expense.paidBy.id ? "gets back" : "owes")
+                                .foregroundColor(split.userId == expense.paidByUserId ? AppColors.owedGreen : AppColors.oweRed)
+                            Text(split.userId == expense.paidByUserId ? "gets back" : "owes")
                                 .font(AppFonts.caption2())
                                 .foregroundColor(AppColors.textTertiary)
                         }

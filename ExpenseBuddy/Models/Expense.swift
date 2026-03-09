@@ -9,22 +9,21 @@ struct Expense: Identifiable, Codable {
     let id: String
     var title: String
     var amount: Double
-    var paidBy: User
-    var participants: [User]
-    var participantIds: [String] // Flat array for Firestore arrayContains queries
-    var participantEmails: [String] // Flat array for actual identity/privacy matching
+    var paidByUserId: String
+    var participantIds: [String] // All participant user IDs (including payer)
     var splitType: SplitType
     var splits: [ExpenseSplit]
     var groupId: String?
     var category: ExpenseCategory
     var note: String?
+    var createdByUserId: String
     var createdAt: Date
+    var updatedAt: Date?
 }
 
 struct ExpenseSplit: Identifiable, Codable {
     var id: String { userId }
-    let userId: String
-    let userName: String
+    var userId: String
     var amountOwed: Double
 }
 
