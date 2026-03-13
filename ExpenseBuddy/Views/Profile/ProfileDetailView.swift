@@ -15,8 +15,13 @@ struct ProfileDetailView: View {
     
     @State private var selectedItem: PhotosPickerItem? = nil
     @State private var isProcessingImage = false
-    @State private var pickedImage: UIImage? = nil
-    @State private var showCropper = false
+    
+    // Identifiable wrapper for item-based sheet presentation
+    struct CropperItem: Identifiable {
+        let id = UUID()
+        let image: UIImage
+    }
+    @State private var activeCropperItem: CropperItem? = nil
     
     /// Use live data from cache so changes reflect instantly.
     private var displayUser: User {
@@ -36,22 +41,19 @@ struct ProfileDetailView: View {
         }
         .navigationTitle("Profile Details")
         .navigationBarTitleDisplayMode(.inline)
-        .fullScreenCover(isPresented: $showCropper) {
-            if let pickedImage {
-                ImageCropperView(
-                    image: pickedImage,
-                    onCropped: { croppedImage in
-                        showCropper = false
-                        Task {
-                            await uploadCroppedImage(croppedImage)
-                        }
-                    },
-                    onCancel: {
-                        showCropper = false
-                        self.pickedImage = nil
+        .fullScreenCover(item: $activeCropperItem) { item in
+            ImageCropperView(
+                image: item.image,
+                onCropped: { croppedImage in
+                    activeCropperItem = nil
+                    Task {
+                        await uploadCroppedImage(croppedImage)
                     }
-                )
-            }
+                },
+                onCancel: {
+                    activeCropperItem = nil
+                }
+            )
         }
     }
     
@@ -142,8 +144,13 @@ struct ProfileDetailView: View {
         do {
             if let data = try await item.loadTransferable(type: Data.self),
                let uiImage = UIImage(data: data) {
-                pickedImage = uiImage
-                showCropper = true
+                // Clear selection immediately
+                selectedItem = nil
+                
+                // Trigger presentation on next runloop to allow PhotosPicker to dismiss
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.activeCropperItem = CropperItem(image: uiImage)
+                }
             }
         } catch {
             print("Failed to load picked image: \(error)")
@@ -166,7 +173,6 @@ struct ProfileDetailView: View {
             await dataService.updateUserProfileImage(base64String: base64String)
         }
         
-        pickedImage = nil
         isProcessingImage = false
     }
     

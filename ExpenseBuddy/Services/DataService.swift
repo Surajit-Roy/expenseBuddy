@@ -29,6 +29,7 @@ class DataService: ObservableObject {
         userCache.$cache
             .dropFirst()
             .sink { [weak self] _ in
+                self?.objectWillChange.send()
                 self?.rebuildSubject.send()
             }
             .store(in: &cancellables)

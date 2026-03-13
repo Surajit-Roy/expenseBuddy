@@ -19,30 +19,27 @@ struct ImageCropperView: View {
     private let cropSize: CGFloat = 280
     
     var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+        VStack(spacing: 0) {
+            // Top bar
+            topBar
             
-            VStack(spacing: 0) {
-                // Top bar
-                topBar
-                
-                Spacer()
-                
-                // Crop area
-                cropArea
-                
-                Spacer()
-                
-                // Hint
-                Text("Pinch to zoom, drag to reposition")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.6))
-                    .padding(.bottom, 20)
-                
-                // Bottom bar
-                bottomBar
-            }
+            Spacer()
+            
+            // Crop area
+            cropArea
+            
+            Spacer()
+            
+            // Hint
+            Text("Pinch to zoom, drag to reposition")
+                .font(.system(size: 14, weight: .medium, design: .rounded))
+                .foregroundColor(.white.opacity(0.6))
+                .padding(.bottom, 20)
+            
+            // Bottom bar
+            bottomBar
         }
+        .background(Color.black.ignoresSafeArea())
     }
     
     // MARK: - Top Bar
@@ -69,7 +66,7 @@ struct ImageCropperView: View {
                 .foregroundColor(.clear)
         }
         .padding(.horizontal, 20)
-        .padding(.top, 16)
+        .padding(.vertical, 16)
     }
     
     // MARK: - Crop Area
