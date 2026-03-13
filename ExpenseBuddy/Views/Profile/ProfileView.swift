@@ -49,7 +49,7 @@ struct ProfileView: View {
     
     private var profileCard: some View {
         HStack(spacing: 16) {
-            AvatarView(name: dataService.currentUser.name, size: 70)
+            AvatarView(name: dataService.currentUser.name, size: 70, base64String: dataService.currentUser.profileImage)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(dataService.currentUser.name)
@@ -58,7 +58,7 @@ struct ProfileView: View {
                 Text(dataService.currentUser.email)
                     .font(AppFonts.subheadline())
                     .foregroundColor(AppColors.textSecondary)
-                Text("Member since \(dataService.currentUser.createdAt.formatted(as: .monthDay))")
+                Text("Member since \(dataService.currentUser.createdAt.formattedWithStyle(.monthDay))")
                     .font(AppFonts.caption())
                     .foregroundColor(AppColors.textTertiary)
             }
@@ -191,9 +191,17 @@ struct ProfileView: View {
             .padding(.vertical, 10)
             
             Divider().padding(.leading, 52)
-            settingRow(icon: "questionmark.circle.fill", title: "Help & Support", color: .blue)
+            NavigationLink(destination: HelpSupportView()) {
+                settingRow(icon: "questionmark.circle.fill", title: "Help & Support", color: .blue)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
             Divider().padding(.leading, 52)
-            settingRow(icon: "shield.fill", title: "Privacy Policy", color: .gray)
+            
+            NavigationLink(destination: PrivacyPolicyView()) {
+                settingRow(icon: "shield.fill", title: "Privacy Policy", color: .gray)
+            }
+            .buttonStyle(PlainButtonStyle())
         }
         .background(AppColors.cardBackground)
         .clipShape(RoundedRectangle(cornerRadius: 16))

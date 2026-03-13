@@ -5,12 +5,18 @@
 
 import SwiftUI
 
-// MARK: - Avatar View
+// MARK: - Avatar Image Cache
+private class AvatarImageCache {
+    static let shared = NSCache<NSString, UIImage>()
+}
 
 struct AvatarView: View {
     let name: String
     let size: CGFloat
+    var base64String: String? = nil
     var backgroundColor: Color = AppColors.primary
+    
+    @State private var decodedImage: UIImage? = nil
     
     private var initials: String {
         let parts = name.split(separator: " ")
@@ -30,19 +36,70 @@ struct AvatarView: View {
     }
     
     var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: gradientColors,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            
-            Text(initials)
-                .font(.system(size: size * 0.38, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+        Group {
+            if let uiImage = decodedImage {
+                Image(uiImage: uiImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    LinearGradient(
+                        colors: gradientColors,
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    
+                    Text(initials)
+                        .font(.system(size: size * 0.38, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                }
+            }
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
+        .onAppear {
+            decodeImageIfNeeded()
+        }
+        .onChange(of: base64String) { _ in
+            decodeImageIfNeeded()
+        }
+    }
+    
+    private func decodeImageIfNeeded() {
+        guard let base64 = base64String, !base64.isEmpty else {
+            decodedImage = nil
+            return
+        }
+        
+        // 2. Decode on a background thread to prevent UI hang
+        Task {
+            // Use a hash of the base64 string as a more efficient cache key
+            let cacheKey = "\(base64.hashValue)"
+            
+            // 1. Check cache again inside task
+            if let cached = AvatarImageCache.shared.object(forKey: cacheKey as NSString) {
+                await MainActor.run {
+                    self.decodedImage = cached
+                }
+                return
+            }
+            
+            let image = await Task.detached(priority: .userInitiated) { () -> UIImage? in
+                guard let data = Data(base64Encoded: base64),
+                      let uiImage = UIImage(data: data) else {
+                    return nil
+                }
+                AvatarImageCache.shared.setObject(uiImage, forKey: cacheKey as NSString)
+                return uiImage
+            }.value
+            
+            await MainActor.run {
+                // Ensure the base64 string hasn't changed while we were decoding
+                if self.base64String == base64 {
+                    self.decodedImage = image
+                }
+            }
+        }
     }
 }
 

@@ -6,10 +6,22 @@
 //
 
 import SwiftUI
+import PhotosUI
 
 struct ProfileDetailView: View {
     let user: User
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var dataService: DataService
+    
+    @State private var selectedItem: PhotosPickerItem? = nil
+    @State private var isProcessingImage = false
+    @State private var pickedImage: UIImage? = nil
+    @State private var showCropper = false
+    
+    /// Use live data for the current user so changes reflect instantly.
+    private var displayUser: User {
+        user.id == dataService.currentUser.id ? dataService.currentUser : user
+    }
     
     var body: some View {
         ZStack {
@@ -17,47 +29,148 @@ struct ProfileDetailView: View {
             
             ScrollView {
                 VStack(spacing: 24) {
-                    // Header Card
-                    VStack(spacing: 16) {
-                        AvatarView(name: user.name, size: 100)
-                            .padding(.top, 24)
-                        
-                        VStack(spacing: 8) {
-                            Text(user.name)
-                                .font(AppFonts.title2())
-                                .foregroundColor(AppColors.textPrimary)
-                            
-                            Text("Member since \(user.createdAt.formatted(as: .monthDay))")
-                                .font(AppFonts.caption())
-                                .foregroundColor(AppColors.textTertiary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.bottom, 28)
-                    .background(AppColors.cardBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 20))
-                    .shadow(color: AppColors.shadow, radius: 10, x: 0, y: 4)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 16)
-                    
-                    // Details Card
-                    VStack(spacing: 0) {
-                        detailRow(title: "Name", value: user.name, icon: "person.fill")
-                        Divider().padding(.leading, 52)
-                        detailRow(title: "Email", value: user.email, icon: "envelope.fill")
-                        Divider().padding(.leading, 52)
-                        detailRow(title: "Mobile Number", value: user.mobileNumber.isEmpty ? "Not provided" : user.mobileNumber, icon: "phone.fill")
-                    }
-                    .background(AppColors.cardBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(color: AppColors.shadow, radius: 8, x: 0, y: 2)
-                    .padding(.horizontal, 20)
+                    headerCard
+                    detailsCard
                 }
             }
         }
         .navigationTitle("Profile Details")
         .navigationBarTitleDisplayMode(.inline)
+        .fullScreenCover(isPresented: $showCropper) {
+            if let pickedImage {
+                ImageCropperView(
+                    image: pickedImage,
+                    onCropped: { croppedImage in
+                        showCropper = false
+                        Task {
+                            await uploadCroppedImage(croppedImage)
+                        }
+                    },
+                    onCancel: {
+                        showCropper = false
+                        self.pickedImage = nil
+                    }
+                )
+            }
+        }
     }
+    
+    // MARK: - Subviews
+    
+    private var headerCard: some View {
+        VStack(spacing: 16) {
+            avatarSection
+            
+            VStack(spacing: 8) {
+                Text(displayUser.name)
+                    .font(AppFonts.title2())
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Text("Member since \(displayUser.createdAt.formattedWithStyle(.monthDay))")
+                    .font(AppFonts.caption())
+                    .foregroundColor(AppColors.textTertiary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.bottom, 28)
+        .background(AppColors.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 20))
+        .shadow(color: AppColors.shadow, radius: 10, x: 0, y: 4)
+        .padding(.horizontal, 20)
+        .padding(.top, 16)
+    }
+    
+    @ViewBuilder
+    private var avatarSection: some View {
+        if user.id == dataService.currentUser.id {
+            PhotosPicker(selection: $selectedItem, matching: .images, photoLibrary: .shared()) {
+                ZStack(alignment: .bottomTrailing) {
+                    AvatarView(name: displayUser.name, size: 100, base64String: displayUser.profileImage)
+                        .overlay(
+                            Group {
+                                if isProcessingImage {
+                                    ZStack {
+                                        Color.black.opacity(0.4).clipShape(Circle())
+                                        ProgressView().tint(.white)
+                                    }
+                                }
+                            }
+                        )
+                    
+                    Image(systemName: "camera.circle.fill")
+                        .font(.system(size: 28))
+                        .foregroundColor(AppColors.primary)
+                        .background(Color.white.clipShape(Circle()))
+                        .offset(x: 4, y: 4)
+                }
+            }
+            .buttonStyle(PlainButtonStyle())
+            .padding(.top, 24)
+            .disabled(isProcessingImage)
+            .onChange(of: selectedItem) { newItem in
+                Task {
+                    await loadPickedImage(item: newItem)
+                }
+            }
+        } else {
+            AvatarView(name: displayUser.name, size: 100, base64String: displayUser.profileImage)
+                .padding(.top, 24)
+        }
+    }
+    
+    private var detailsCard: some View {
+        VStack(spacing: 0) {
+            detailRow(title: "Name", value: displayUser.name, icon: "person.fill")
+            Divider().padding(.leading, 52)
+            detailRow(title: "Email", value: displayUser.email, icon: "envelope.fill")
+            Divider().padding(.leading, 52)
+            let mobile = displayUser.mobileNumber ?? ""
+            detailRow(title: "Mobile Number", value: mobile.isEmpty ? "Not provided" : mobile, icon: "phone.fill")
+        }
+        .background(AppColors.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: AppColors.shadow, radius: 8, x: 0, y: 2)
+        .padding(.horizontal, 20)
+    }
+    
+    // MARK: - Photo Flow
+    
+    /// Step 1: Load the picked photo into a UIImage, then show the cropper.
+    private func loadPickedImage(item: PhotosPickerItem?) async {
+        guard let item = item else { return }
+        
+        do {
+            if let data = try await item.loadTransferable(type: Data.self),
+               let uiImage = UIImage(data: data) {
+                pickedImage = uiImage
+                showCropper = true
+            }
+        } catch {
+            print("Failed to load picked image: \(error)")
+        }
+    }
+    
+    /// Step 2: After cropping, compress and upload.
+    private func uploadCroppedImage(_ croppedImage: UIImage) async {
+        isProcessingImage = true
+        
+        // Move expensive encoding to background
+        let base64String = await Task.detached(priority: .userInitiated) { () -> String? in
+            guard let compressedData = croppedImage.jpegData(compressionQuality: 0.5) else {
+                return nil
+            }
+            return compressedData.base64EncodedString()
+        }.value
+        
+        if let base64String {
+            await dataService.updateUserProfileImage(base64String: base64String)
+        }
+        
+        pickedImage = nil
+        isProcessingImage = false
+    }
+    
+    // MARK: - Detail Row
     
     private func detailRow(title: String, value: String, icon: String) -> some View {
         HStack(spacing: 16) {

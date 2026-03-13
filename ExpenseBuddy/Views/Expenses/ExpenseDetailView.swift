@@ -58,7 +58,7 @@ struct ExpenseDetailView: View {
             Text(currencyManager.format(expense.amount))
                 .font(.system(size: 36, weight: .bold, design: .rounded))
                 .foregroundColor(AppColors.textPrimary)
-            Text(expense.createdAt.formatted(as: .full))
+            Text(expense.createdAt.formattedWithStyle(.full))
                 .font(AppFonts.caption())
                 .foregroundColor(AppColors.textSecondary)
         }

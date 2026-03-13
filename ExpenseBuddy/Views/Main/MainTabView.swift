@@ -40,7 +40,7 @@ struct MainTabView: View {
                 dataService.userCache.seed(user)
             }
         }
-        .onChange(of: authService.currentUser) { _, newUser in
+        .onChange(of: authService.currentUser) { newUser in
             if let user = newUser {
                 dataService.currentUser = user
                 dataService.userCache.seed(user)

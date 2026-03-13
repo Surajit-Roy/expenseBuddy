@@ -101,7 +101,7 @@ struct FriendDetailView: View {
                     .foregroundColor(AppColors.textSecondary)
             }
             
-            Text("Friends since \(friend.createdAt.formatted(as: .monthDay))")
+            Text("Friends since \(friend.createdAt.formattedWithStyle(.monthDay))")
                 .font(AppFonts.caption())
                 .foregroundColor(AppColors.textTertiary)
         }

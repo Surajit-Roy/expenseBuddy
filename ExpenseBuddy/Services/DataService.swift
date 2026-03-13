@@ -22,14 +22,22 @@ class DataService: ObservableObject {
     private let db = Firestore.firestore()
     private var listeners: [ListenerRegistration] = []
     private var cancellables = Set<AnyCancellable>()
+    private let rebuildSubject = PassthroughSubject<Void, Never>()
     
     init() {
         // Re-render activity feed whenever UserCache updates (names arrive)
         userCache.$cache
             .dropFirst()
-            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
             .sink { [weak self] _ in
-                self?.rebuildActivityFeed()
+                self?.rebuildSubject.send()
+            }
+            .store(in: &cancellables)
+            
+        // Debounced activity feed rebuild
+        rebuildSubject
+            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+            .sink { [weak self] in
+                self?.rebuildActivityFeedNow()
             }
             .store(in: &cancellables)
         
@@ -86,9 +94,18 @@ class DataService: ObservableObject {
                     if let error = error { print("Groups listener error: \(error)") }
                     return
                 }
-                self.groups = documents.compactMap { try? $0.data(as: ExpenseGroup.self) }
-                self.resolveUserIds()
-                self.rebuildActivityFeed()
+                
+                Task {
+                    let decodedGroups = await Task.detached(priority: .userInitiated) {
+                        documents.compactMap { try? $0.data(as: ExpenseGroup.self) }
+                    }.value
+                    
+                    await MainActor.run {
+                        self.groups = decodedGroups
+                        self.resolveUserIds()
+                        self.rebuildActivityFeed()
+                    }
+                }
             }
             
         // 2. Listen to Expenses where user is a participant (uses flat participantIds array)
@@ -99,9 +116,18 @@ class DataService: ObservableObject {
                     if let error = error { print("Expenses listener error: \(error)") }
                     return
                 }
-                self.expenses = documents.compactMap { try? $0.data(as: Expense.self) }
-                self.resolveUserIds()
-                self.rebuildActivityFeed()
+                
+                Task {
+                    let decodedExpenses = await Task.detached(priority: .userInitiated) {
+                        documents.compactMap { try? $0.data(as: Expense.self) }
+                    }.value
+                    
+                    await MainActor.run {
+                        self.expenses = decodedExpenses
+                        self.resolveUserIds()
+                        self.rebuildActivityFeed()
+                    }
+                }
             }
             
         // 3. Listen to Settlements where user is a participant (uses flat participantIds array)
@@ -112,9 +138,18 @@ class DataService: ObservableObject {
                     if let error = error { print("Settlements listener error: \(error)") }
                     return
                 }
-                self.settlements = documents.compactMap { try? $0.data(as: Settlement.self) }
-                self.resolveUserIds()
-                self.rebuildActivityFeed()
+                
+                Task {
+                    let decodedSettlements = await Task.detached(priority: .userInitiated) {
+                        documents.compactMap { try? $0.data(as: Settlement.self) }
+                    }.value
+                    
+                    await MainActor.run {
+                        self.settlements = decodedSettlements
+                        self.resolveUserIds()
+                        self.rebuildActivityFeed()
+                    }
+                }
             }
             
         // 4. Friends list — private subcollection for the current user
@@ -124,13 +159,45 @@ class DataService: ObservableObject {
                     if let error = error { print("Friends listener error: \(error)") }
                     return
                 }
-                self.friends = documents.compactMap { try? $0.data(as: User.self) }
-                // Seed cache with all friends
-                self.userCache.seed(self.friends)
-                self.rebuildActivityFeed()
+                
+                Task {
+                    let decodedFriends = await Task.detached(priority: .userInitiated) {
+                        documents.compactMap { try? $0.data(as: User.self) }
+                    }.value
+                    
+                    await MainActor.run {
+                        self.friends = decodedFriends
+                        // Seed cache with all friends
+                        self.userCache.seed(self.friends)
+                        self.rebuildActivityFeed()
+                    }
+                }
             }
             
-        listeners.append(contentsOf: [groupsListener, expensesListener, settlementsListener, friendsListener])
+        // 5. Listen to Current User document for real-time profile updates
+        let currentUserListener = db.collection("users").document(userId)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self, let document = snapshot else {
+                    if let error = error { print("Current user listener error: \(error)") }
+                    return
+                }
+                
+                Task {
+                    let updatedUser = await Task.detached(priority: .userInitiated) {
+                        try? document.data(as: User.self)
+                    }.value
+                    
+                    if let updatedUser {
+                        await MainActor.run {
+                            self.currentUser = updatedUser
+                            self.userCache.seed(updatedUser)
+                            self.rebuildActivityFeed()
+                        }
+                    }
+                }
+            }
+            
+        listeners.append(contentsOf: [groupsListener, expensesListener, settlementsListener, friendsListener, currentUserListener])
     }
     
     // MARK: - User ID Resolution
@@ -165,6 +232,10 @@ class DataService: ObservableObject {
     // MARK: - Activity Feed
     
     func rebuildActivityFeed() {
+        rebuildSubject.send()
+    }
+    
+    private func rebuildActivityFeedNow() {
         var items: [ActivityItem] = []
         
         for expense in expenses {
@@ -414,6 +485,30 @@ class DataService: ObservableObject {
     /// Validation: A friend can only be removed if you have no outstanding balance with them.
     func canDeleteFriend(_ friendId: String) -> Bool {
         return abs(balanceWithFriend(friendId)) < 0.01
+    }
+    
+    // MARK: - Update User Profile
+    
+    func updateUserProfileImage(base64String: String) async {
+        let userId = currentUser.id
+        
+        do {
+            // 1. Update Firestore
+            try await db.collection("users").document(userId).updateData([
+                "profileImage": base64String
+            ])
+            
+            // 2. Local state will be updated by the listener, but we can update it immediately for snappiness
+            // This also ensures currentUser is updated by re-assignment to trigger @Published
+            var updatedUser = currentUser
+            updatedUser.profileImage = base64String
+            currentUser = updatedUser
+            userCache.seed(currentUser)
+            rebuildActivityFeed()
+            
+        } catch {
+            print("Error updating profile image: \(error)")
+        }
     }
     
     // MARK: - Queries

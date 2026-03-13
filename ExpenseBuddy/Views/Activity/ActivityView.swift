@@ -103,7 +103,7 @@ struct ActivityView: View {
                         .clipShape(Capsule())
                     }
                     
-                    Text(item.date.formatted(as: .relative))
+                    Text(item.date.formattedWithStyle(.relative))
                         .font(AppFonts.caption2())
                         .foregroundColor(AppColors.textTertiary)
                 }

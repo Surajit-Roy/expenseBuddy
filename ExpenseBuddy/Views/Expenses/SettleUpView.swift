@@ -33,7 +33,23 @@ struct SettleUpView: View {
     /// Positive = friend owes you, negative = you owe friend.
     private var selectedBalance: Double {
         guard !selectedUserId.isEmpty else { return 0 }
-        return dataService.balanceWithFriend(selectedUserId)
+        return contextBalance(for: selectedUserId)
+    }
+    
+    /// Returns the group-specific balance if within a group, otherwise the global balance.
+    private func contextBalance(for friendId: String) -> Double {
+        if let groupId = groupId {
+            let groupExpenses = dataService.expensesForGroup(groupId)
+            let groupSettlements = dataService.settlementsForGroup(groupId)
+            return ExpenseCalculator.balanceBetween(
+                currentUserId: dataService.currentUser.id,
+                friendId: friendId,
+                expenses: groupExpenses,
+                settlements: groupSettlements
+            )
+        } else {
+            return dataService.balanceWithFriend(friendId)
+        }
     }
     
     /// True = I owe the selected person (I should pay them).
@@ -85,7 +101,7 @@ struct SettleUpView: View {
                                                 .font(AppFonts.headline())
                                                 .foregroundColor(AppColors.textPrimary)
                                             
-                                            let bal = dataService.balanceWithFriend(member.id)
+                                            let bal = contextBalance(for: member.id)
                                             if abs(bal) > 0.01 {
                                                 if bal > 0 {
                                                     Text("owes you \(currencyManager.format(bal))")
@@ -280,7 +296,7 @@ struct SettleUpView: View {
         errorMessage = nil
         
         // Auto-fill the amount with the outstanding balance in the currently selected currency
-        let bal = dataService.balanceWithFriend(member.id)
+        let bal = contextBalance(for: member.id)
         if abs(bal) > 0.01 {
             amountText = String(format: "%.2f", currencyManager.convert(abs(bal)))
         } else {
@@ -306,7 +322,7 @@ struct SettleUpView: View {
             return
         }
         
-        let balance = dataService.balanceWithFriend(selectedUserId)
+        let balance = contextBalance(for: selectedUserId)
         
         // Determine the correct direction:
         // If balance < 0 (I owe them): fromUser = me, toUser = them (I pay them)

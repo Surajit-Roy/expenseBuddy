@@ -370,7 +370,7 @@ struct Validator {
 // MARK: - Date Formatters
 
 extension Date {
-    func formatted(as style: DateFormatStyle) -> String {
+    func formattedWithStyle(_ style: DateFormatStyle) -> String {
         let formatter = DateFormatter()
         switch style {
         case .short:
