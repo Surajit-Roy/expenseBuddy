@@ -164,7 +164,7 @@ struct GroupDetailView: View {
                     let toName = entry.toUserName.isEmpty ? dataService.userCache.name(for: entry.toUserId) : entry.toUserName
                     
                     HStack(spacing: 12) {
-                        AvatarView(name: fromName, size: 36)
+                        AvatarView(name: fromName, size: 36, base64String: dataService.userCache.user(for: entry.fromUserId)?.profileImage)
                         
                         HStack(spacing: 4) {
                             Text(fromName.components(separatedBy: " ").first ?? "")
@@ -223,7 +223,7 @@ struct GroupDetailView: View {
                     let toName = debt.toUserName.isEmpty ? dataService.userCache.name(for: debt.toUserId) : debt.toUserName
                     
                     HStack(spacing: 12) {
-                        AvatarView(name: fromName, size: 36)
+                        AvatarView(name: fromName, size: 36, base64String: dataService.userCache.user(for: debt.fromUserId)?.profileImage)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             HStack(spacing: 4) {
@@ -277,7 +277,7 @@ struct GroupDetailView: View {
                     ForEach(group.memberIds, id: \.self) { memberId in
                         let member = dataService.userCache.userOrPlaceholder(for: memberId)
                         VStack(spacing: 6) {
-                            AvatarView(name: member.name, size: 50)
+                            AvatarView(name: member.name, size: 50, base64String: member.profileImage)
                             Text(member.name.components(separatedBy: " ").first ?? "")
                                 .font(AppFonts.caption())
                                 .foregroundColor(AppColors.textSecondary)

@@ -89,14 +89,16 @@ struct FriendDetailView: View {
     }
     
     private var friendHeader: some View {
-        VStack(spacing: 14) {
-            AvatarView(name: friend.name, size: 80)
+        let resolvedUser = dataService.userCache.userOrPlaceholder(for: friend.id)
+        
+        return VStack(spacing: 14) {
+            AvatarView(name: resolvedUser.name, size: 80, base64String: resolvedUser.profileImage)
             
             VStack(spacing: 4) {
-                Text(friend.name)
+                Text(resolvedUser.name)
                     .font(AppFonts.title2())
                     .foregroundColor(AppColors.textPrimary)
-                Text(friend.email)
+                Text(resolvedUser.email)
                     .font(AppFonts.subheadline())
                     .foregroundColor(AppColors.textSecondary)
             }

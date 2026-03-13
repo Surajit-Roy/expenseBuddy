@@ -124,7 +124,7 @@ struct ExpenseDetailView: View {
                     let splitUserName = dataService.userCache.name(for: split.userId)
                     
                     HStack(spacing: 14) {
-                        AvatarView(name: splitUserName, size: 40)
+                        AvatarView(name: splitUserName, size: 40, base64String: dataService.userCache.user(for: split.userId)?.profileImage)
                         
                         VStack(alignment: .leading, spacing: 2) {
                             Text(splitUserName)

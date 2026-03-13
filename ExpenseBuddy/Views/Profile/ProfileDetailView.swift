@@ -18,9 +18,9 @@ struct ProfileDetailView: View {
     @State private var pickedImage: UIImage? = nil
     @State private var showCropper = false
     
-    /// Use live data for the current user so changes reflect instantly.
+    /// Use live data from cache so changes reflect instantly.
     private var displayUser: User {
-        user.id == dataService.currentUser.id ? dataService.currentUser : user
+        dataService.userCache.userOrPlaceholder(for: user.id)
     }
     
     var body: some View {

@@ -16,6 +16,22 @@ class UserCache: ObservableObject {
     
     private let db = Firestore.firestore()
     private var pendingFetches: Set<String> = []
+    private var listeners: [String: ListenerRegistration] = [:]
+    
+    deinit {
+        let currentListeners = listeners
+        Task {
+            for (_, listener) in currentListeners {
+                listener.remove()
+            }
+        }
+    }
+    
+    /// Publicly accessible cleanup if needed, but deinit handles listener removal.
+    func clearCache() {
+        cache.removeAll()
+        pendingFetches.removeAll()
+    }
     
     /// Synchronous cache lookup — returns nil if user is not yet cached.
     func user(for id: String) -> User? {
@@ -40,58 +56,54 @@ class UserCache: ObservableObject {
     /// Seed the cache with a known user (e.g., current user, friends).
     func seed(_ user: User) {
         cache[user.id] = user
+        // If we seed a user, we should also ensure we have a listener for them if it's missing (optional, but good for real-time)
+        setupListener(for: user.id)
     }
     
     /// Seed multiple users at once.
     func seed(_ users: [User]) {
         for user in users {
-            cache[user.id] = user
+            seed(user)
         }
     }
     
     /// Batch-fetch users from Firestore that aren't already cached.
-    /// Firestore `in` queries support max 30 items, so we chunk automatically.
     func fetchIfNeeded(ids: [String]) {
-        let unknownIds = ids.filter { cache[$0] == nil && !pendingFetches.contains($0) }
-        guard !unknownIds.isEmpty else { return }
-        
-        // Mark as pending to avoid duplicate fetches
-        pendingFetches.formUnion(unknownIds)
-        
-        // Firestore `in` queries support max 30 items per query
-        let chunks = unknownIds.chunked(into: 30)
-        
-        for chunk in chunks {
-            Task {
-                await fetchChunk(chunk)
-            }
+        for id in ids {
+            setupListener(for: id)
         }
     }
     
-    private func fetchChunk(_ ids: [String]) async {
-        do {
-            let snapshot = try await db.collection("users")
-                .whereField(FieldPath.documentID(), in: ids)
-                .getDocuments()
-            
-            for document in snapshot.documents {
+    private func setupListener(for id: String) {
+        guard !id.isEmpty else { return }
+        guard listeners[id] == nil else { return }
+        
+        // Use a snapshot listener instead of a one-time get
+        let listener = db.collection("users").document(id)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    print("UserCache: Listener error for \(id): \(error)")
+                    return
+                }
+                
+                guard let document = snapshot, document.exists else {
+                    // User might have been deleted
+                    Task { @MainActor in
+                        self.cache.removeValue(forKey: id)
+                    }
+                    return
+                }
+                
                 if let user = try? document.data(as: User.self) {
-                    cache[user.id] = user
-                    pendingFetches.remove(user.id)
+                    Task { @MainActor in
+                        self.cache[user.id] = user
+                    }
                 }
             }
             
-            // Remove any IDs that weren't found (deleted users, etc.)
-            for id in ids where cache[id] == nil {
-                pendingFetches.remove(id)
-            }
-        } catch {
-            print("UserCache: Failed to fetch users: \(error)")
-            // Remove from pending so they can be retried
-            for id in ids {
-                pendingFetches.remove(id)
-            }
-        }
+        listeners[id] = listener
     }
 }
 

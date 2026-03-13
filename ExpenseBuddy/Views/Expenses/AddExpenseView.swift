@@ -243,10 +243,11 @@ struct AddExpenseView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 10) {
                     ForEach(viewModel.availableMembers) { member in
+                        let resolvedMember = dataService.userCache.userOrPlaceholder(for: member.id)
                         Button(action: { viewModel.paidByUserId = member.id }) {
                             HStack(spacing: 8) {
-                                AvatarView(name: member.name, size: 28)
-                                Text(member.name.components(separatedBy: " ").first ?? "")
+                                AvatarView(name: resolvedMember.name, size: 28, base64String: resolvedMember.profileImage)
+                                Text(resolvedMember.name.components(separatedBy: " ").first ?? "")
                                     .font(AppFonts.subheadline())
                             }
                             .padding(.horizontal, 14)
@@ -333,9 +334,10 @@ struct AddExpenseView: View {
                         if isSelected { viewModel.selectedParticipantIds.remove(member.id) }
                         else { viewModel.selectedParticipantIds.insert(member.id) }
                     }) {
+                        let resolvedMember = dataService.userCache.userOrPlaceholder(for: member.id)
                         HStack(spacing: 12) {
-                            AvatarView(name: member.name, size: 36)
-                            Text(member.name)
+                            AvatarView(name: resolvedMember.name, size: 36, base64String: resolvedMember.profileImage)
+                            Text(resolvedMember.name)
                                 .font(AppFonts.subheadline())
                                 .foregroundColor(AppColors.textPrimary)
                             Spacer()
@@ -389,9 +391,10 @@ struct AddExpenseView: View {
             
             VStack(spacing: 12) {
                 ForEach(viewModel.selectedParticipants) { participant in
+                    let resolvedParticipant = dataService.userCache.userOrPlaceholder(for: participant.id)
                     HStack(spacing: 12) {
-                        AvatarView(name: participant.name, size: 32)
-                        Text(participant.name.components(separatedBy: " ").first ?? "")
+                        AvatarView(name: resolvedParticipant.name, size: 32, base64String: resolvedParticipant.profileImage)
+                        Text(resolvedParticipant.name.components(separatedBy: " ").first ?? "")
                             .font(AppFonts.subheadline())
                             .foregroundColor(AppColors.textPrimary)
                             .frame(width: 70, alignment: .leading)

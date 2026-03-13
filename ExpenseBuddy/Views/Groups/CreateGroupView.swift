@@ -130,13 +130,14 @@ struct CreateGroupView: View {
                                         else { selectedFriendIds.insert(friend.id) }
                                     }) {
                                         HStack(spacing: 14) {
-                                            AvatarView(name: friend.name, size: 40)
+                                            let resolvedFriend = dataService.userCache.userOrPlaceholder(for: friend.id)
+                                            AvatarView(name: resolvedFriend.name, size: 40, base64String: resolvedFriend.profileImage)
                                             
                                             VStack(alignment: .leading, spacing: 2) {
-                                                Text(friend.name)
+                                                Text(resolvedFriend.name)
                                                     .font(AppFonts.headline())
                                                     .foregroundColor(AppColors.textPrimary)
-                                                Text(friend.email)
+                                                Text(resolvedFriend.email)
                                                     .font(AppFonts.caption())
                                                     .foregroundColor(AppColors.textSecondary)
                                             }

@@ -92,12 +92,13 @@ struct SettleUpView: View {
                         
                         VStack(spacing: 0) {
                             ForEach(otherMembers) { member in
+                                let resolvedMember = dataService.userCache.userOrPlaceholder(for: member.id)
                                 Button(action: { selectMember(member) }) {
                                     HStack(spacing: 14) {
-                                        AvatarView(name: member.name, size: 42)
+                                        AvatarView(name: resolvedMember.name, size: 42, base64String: resolvedMember.profileImage)
                                         
                                         VStack(alignment: .leading, spacing: 2) {
-                                            Text(member.name)
+                                            Text(resolvedMember.name)
                                                 .font(AppFonts.headline())
                                                 .foregroundColor(AppColors.textPrimary)
                                             
