@@ -50,6 +50,7 @@ struct ProfileView: View {
     private var profileCard: some View {
         HStack(spacing: 16) {
             AvatarView(name: dataService.currentUser.name, size: 70, base64String: dataService.currentUser.profileImage)
+                .id(dataService.currentUser.profileImage)
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(dataService.currentUser.name)

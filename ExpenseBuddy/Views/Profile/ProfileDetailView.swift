@@ -23,9 +23,12 @@ struct ProfileDetailView: View {
     }
     @State private var activeCropperItem: CropperItem? = nil
     
-    /// Use live data from cache so changes reflect instantly.
+    /// Use live data from cache (or direct currentUser for the owner) so changes reflect instantly.
     private var displayUser: User {
-        dataService.userCache.userOrPlaceholder(for: user.id)
+        if user.id == dataService.currentUser.id {
+            return dataService.currentUser
+        }
+        return dataService.userCache.userOrPlaceholder(for: user.id)
     }
     
     var body: some View {
@@ -88,6 +91,7 @@ struct ProfileDetailView: View {
             PhotosPicker(selection: $selectedItem, matching: .images, photoLibrary: .shared()) {
                 ZStack(alignment: .bottomTrailing) {
                     AvatarView(name: displayUser.name, size: 100, base64String: displayUser.profileImage)
+                        .id(displayUser.profileImage) // Force refresh when image changes
                         .overlay(
                             Group {
                                 if isProcessingImage {
