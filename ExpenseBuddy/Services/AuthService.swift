@@ -21,6 +21,13 @@ class AuthService: ObservableObject {
     private let db = Firestore.firestore()
     
     init() {
+        // Detect fresh installation to force login
+        let hasLaunchedBefore = UserDefaults.standard.bool(forKey: "hasLaunchedBefore")
+        if !hasLaunchedBefore {
+            try? Auth.auth().signOut()
+            UserDefaults.standard.set(true, forKey: "hasLaunchedBefore")
+        }
+        
         Auth.auth().addStateDidChangeListener { [weak self] auth, user in
             guard let self = self else { return }
             if let user = user {

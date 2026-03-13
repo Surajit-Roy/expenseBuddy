@@ -79,7 +79,7 @@ struct HelpSupportView: View {
     
     private var contactCard: some View {
         Button(action: {
-            if let url = URL(string: "mailto:support@expensebuddy.app") {
+            if let url = URL(string: "mailto:surajitroy9064@gmail.com") {
                 UIApplication.shared.open(url)
             }
         }) {

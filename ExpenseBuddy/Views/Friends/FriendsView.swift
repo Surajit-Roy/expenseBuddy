@@ -97,7 +97,7 @@ struct FriendsView: View {
     private func friendRow(_ friend: User) -> some View {
         let resolvedUser = dataService.userCache.userOrPlaceholder(for: friend.id)
         
-        return HStack(spacing: 14) {
+        return HStack(spacing: 5) {
             AvatarView(name: resolvedUser.name, size: 48, base64String: resolvedUser.profileImage)
             
             VStack(alignment: .leading, spacing: 4) {
@@ -107,7 +107,9 @@ struct FriendsView: View {
                 Text(resolvedUser.email)
                     .font(AppFonts.caption())
                     .foregroundColor(AppColors.textSecondary)
+                    .multilineTextAlignment(.leading)
             }
+            .padding(.leading, 5)
             
             Spacer()
             
