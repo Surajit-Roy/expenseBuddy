@@ -199,6 +199,13 @@ struct ProfileView: View {
             
             Divider().padding(.leading, 52)
             
+            NavigationLink(destination: FriendsExpenseChartView()) {
+                settingRow(icon: "chart.pie.fill", title: "Friends Expenses Chart", color: .purple)
+            }
+            .buttonStyle(PlainButtonStyle())
+            
+            Divider().padding(.leading, 52)
+            
             NavigationLink(destination: PrivacyPolicyView()) {
                 settingRow(icon: "shield.fill", title: "Privacy Policy", color: .gray)
             }
