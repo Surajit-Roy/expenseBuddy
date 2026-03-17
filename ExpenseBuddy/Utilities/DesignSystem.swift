@@ -15,6 +15,11 @@ struct AppColors {
     static let primaryLight = Color(hex: "#8183C4")
     static let primaryDark = Color(hex: "#3D4076")
     
+    // Auth Theme (Deep Navy)
+    static let darkBackground = Color(hex: "#0F172A")
+    static let darkCard = Color(hex: "#1E293B").opacity(0.8)
+    static let darkTextSecondary = Color.white.opacity(0.6)
+    
     // Accent
     static let accent = Color(hex: "#1DB954")
     static let accentSecondary = Color(hex: "#FF6B6B")
@@ -198,6 +203,22 @@ struct TextFieldModifier: ViewModifier {
     }
 }
 
+struct GlassBackgroundModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color.white.opacity(0.08))
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    )
+            )
+    }
+}
+
 extension View {
     func cardStyle() -> some View {
         modifier(CardModifier())
@@ -213,6 +234,10 @@ extension View {
     
     func textFieldStyle() -> some View {
         modifier(TextFieldModifier())
+    }
+    
+    func glassStyle() -> some View {
+        modifier(GlassBackgroundModifier())
     }
 }
 
