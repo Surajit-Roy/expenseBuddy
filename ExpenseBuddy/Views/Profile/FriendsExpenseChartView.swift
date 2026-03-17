@@ -18,39 +18,64 @@ struct FriendsExpenseChartView: View {
         case categories = "Categories"
     }
     
+    @State private var appearAnimate = false
+    
     var body: some View {
         ZStack {
-            AppColors.background.ignoresSafeArea()
+            ModernBackground()
             
-            VStack(spacing: 20) {
-                // Segmented Picker
-                Picker("Chart Type", selection: $selectedChart) {
+            VStack(spacing: 0) {
+                // Custom Segmented Picker
+                HStack(spacing: 4) {
                     ForEach(ChartType.allCases, id: \.self) { type in
-                        Text(type.rawValue).tag(type)
+                        Button(action: {
+                            withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                                selectedChart = type
+                            }
+                        }) {
+                            Text(type.rawValue)
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                                .padding(.vertical, 10)
+                                .frame(maxWidth: .infinity)
+                                .background(selectedChart == type ? AppColors.primary : Color.clear)
+                                .foregroundColor(selectedChart == type ? .white : AppColors.textSecondary)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
                     }
                 }
-                .pickerStyle(SegmentedPickerStyle())
-                .padding(.horizontal, 20)
+                .padding(4)
+                .background(Color.black.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .padding(.horizontal, 24)
                 .padding(.top, 10)
+                .offset(y: appearAnimate ? 0 : -10)
+                .opacity(appearAnimate ? 1 : 0)
                 
                 ScrollView {
-                    VStack(spacing: 24) {
+                    VStack(spacing: 32) {
                         if selectedChart == .balances {
                             balanceChartSection
+                                .transition(.asymmetric(insertion: .move(edge: .leading).combined(with: .opacity), removal: .move(edge: .trailing).combined(with: .opacity)))
                         } else {
                             categoryChartSection
+                                .transition(.asymmetric(insertion: .move(edge: .trailing).combined(with: .opacity), removal: .move(edge: .leading).combined(with: .opacity)))
                         }
                         
                         summarySection
+                            .offset(y: appearAnimate ? 0 : 20)
+                            .opacity(appearAnimate ? 1 : 0)
                     }
-                    .padding(.bottom, 30)
+                    .padding(.vertical, 24)
                 }
             }
         }
-        .navigationTitle("Insights")
+        .navigationTitle("Spending Insights")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            withAnimation(.easeInOut(duration: 0.8)) {
+            withAnimation(.easeOut(duration: 0.6)) {
+                appearAnimate = true
+            }
+            withAnimation(.easeInOut(duration: 0.8).delay(0.2)) {
                 isAnimating = true
             }
         }
@@ -59,52 +84,54 @@ struct FriendsExpenseChartView: View {
     // MARK: - Balance Chart Section
     
     private var balanceChartSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 18) {
             Text("Friend Balances")
-                .font(AppFonts.title3())
+                .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(AppColors.textPrimary)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
             
             let balances = calculateFriendBalances()
             
             if balances.isEmpty {
                 emptyState(message: "No balances to display.")
             } else {
-                Chart {
-                    ForEach(balances) { item in
-                        BarMark(
-                            x: .value("Friend", item.name),
-                            y: .value("Amount", isAnimating ? item.amount : 0)
-                        )
-                        .foregroundStyle(item.amount >= 0 ? AppColors.greenGradient : AppColors.redGradient)
-                        .cornerRadius(8)
-                        .annotation(position: .top) {
-                            Text(CurrencyManager.shared.format(item.amount))
-                                .font(AppFonts.caption2())
-                                .foregroundColor(AppColors.textSecondary)
+                VStack(spacing: 20) {
+                    Chart {
+                        ForEach(balances) { item in
+                            BarMark(
+                                x: .value("Friend", item.name),
+                                y: .value("Amount", isAnimating ? item.amount : 0)
+                            )
+                            .foregroundStyle(item.amount >= 0 ? AppColors.primary.gradient : Color.red.gradient)
+                            .cornerRadius(10)
+                            .annotation(position: .top) {
+                                Text(CurrencyManager.shared.format(item.amount))
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                                    .foregroundColor(AppColors.textSecondary)
+                                    .padding(.bottom, 4)
+                            }
+                        }
+                        
+                        RuleMark(y: .value("Zero", 0))
+                            .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
+                            .foregroundStyle(Color.gray.opacity(0.3))
+                    }
+                    .frame(height: 250)
+                    .chartYAxis {
+                        AxisMarks(position: .leading) { value in
+                            AxisGridLine().foregroundStyle(Color.gray.opacity(0.1))
+                            AxisValueLabel().font(.system(size: 10, weight: .medium, design: .rounded))
                         }
                     }
-                    
-                    RuleMark(y: .value("Zero", 0))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [5, 5]))
-                        .foregroundStyle(AppColors.textTertiary)
-                }
-                .frame(height: 300)
-                .padding(.horizontal, 20)
-                .chartYAxis {
-                    AxisMarks(position: .leading)
-                }
-                .chartXAxis {
-                    AxisMarks(values: .automatic) { value in
-                        AxisValueLabel()
-                            .font(AppFonts.caption())
+                    .chartXAxis {
+                        AxisMarks(values: .automatic) { value in
+                            AxisValueLabel().font(.system(size: 11, weight: .semibold, design: .rounded))
+                        }
                     }
                 }
-                .padding(20)
-                .background(AppColors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 24))
-                .shadow(color: AppColors.shadow, radius: 15, x: 0, y: 10)
-                .padding(.horizontal, 20)
+                .padding(24)
+                .glassStyle(cornerRadius: 30)
+                .padding(.horizontal, 24)
             }
         }
     }
@@ -112,35 +139,49 @@ struct FriendsExpenseChartView: View {
     // MARK: - Category Chart Section
     
     private var categoryChartSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 18) {
             Text("Spending by Category")
-                .font(AppFonts.title3())
+                .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(AppColors.textPrimary)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
             
             let categoryData = calculateCategorySpending()
             
             if categoryData.isEmpty {
                 emptyState(message: "No expenses found.")
             } else {
-                Chart {
-                    ForEach(categoryData) { item in
-                        SectorMark(
-                            angle: .value("Amount", isAnimating ? item.amount : 0),
-                            innerRadius: .ratio(0.65),
-                            angularInset: 2
-                        )
-                        .foregroundStyle(by: .value("Category", item.category))
-                        .cornerRadius(6)
+                VStack(spacing: 20) {
+                    Chart {
+                        ForEach(categoryData) { item in
+                            SectorMark(
+                                angle: .value("Amount", isAnimating ? item.amount : 0),
+                                innerRadius: .ratio(0.7),
+                                angularInset: 3
+                            )
+                            .foregroundStyle(by: .value("Category", item.category))
+                            .cornerRadius(8)
+                        }
+                    }
+                    .frame(height: 250)
+                    .chartLegend(position: .bottom, alignment: .center, spacing: 16)
+                    .chartBackground { chartProxy in
+                        GeometryReader { geometry in
+                            let total = categoryData.reduce(0) { $0 + $1.amount }
+                            VStack {
+                                Text("Total")
+                                    .font(.system(size: 14, weight: .medium, design: .rounded))
+                                    .foregroundColor(AppColors.textTertiary)
+                                Text(CurrencyManager.shared.format(total))
+                                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                                    .foregroundColor(AppColors.textPrimary)
+                            }
+                            .position(x: geometry.size.width / 2, y: geometry.size.height / 2 - 10)
+                        }
                     }
                 }
-                .frame(height: 300)
-                .chartLegend(position: .bottom, alignment: .center, spacing: 16)
-                .padding(20)
-                .background(AppColors.cardBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 24))
-                .shadow(color: AppColors.shadow, radius: 15, x: 0, y: 10)
-                .padding(.horizontal, 20)
+                .padding(24)
+                .glassStyle(cornerRadius: 30)
+                .padding(.horizontal, 24)
             }
         }
     }
@@ -148,58 +189,71 @@ struct FriendsExpenseChartView: View {
     // MARK: - Summary Section
     
     private var summarySection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Summary")
-                .font(AppFonts.title3())
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Quick Summary")
+                .font(.system(size: 20, weight: .bold, design: .rounded))
                 .foregroundColor(AppColors.textPrimary)
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 24)
             
-            VStack(spacing: 16) {
-                summaryRow(title: "Total Expenses", value: dataService.expenses.reduce(0) { $0 + $1.amount }, color: AppColors.primary)
+            VStack(spacing: 0) {
+                summaryRow(title: "Total Expenses", value: dataService.expenses.reduce(0) { $0 + $1.amount }, color: AppColors.primary, icon: "cart.fill")
+                
+                Divider().padding(.leading, 56).opacity(0.3)
                 
                 let balance = dataService.overallBalance()
                 summaryRow(
-                    title: balance >= 0 ? "Others owe you" : "You owe total",
+                    title: balance >= 0 ? "Others Owe You" : "You Owe Total",
                     value: abs(balance),
-                    color: balance >= 0 ? AppColors.owedGreen : AppColors.oweRed
+                    color: balance >= 0 ? AppColors.owedGreen : AppColors.oweRed,
+                    icon: balance >= 0 ? "arrow.down.left.circle.fill" : "arrow.up.right.circle.fill"
                 )
                 
-                summaryRow(title: "Active Friends", value: Double(dataService.friends.count), color: .orange, isCurrency: false)
+                Divider().padding(.leading, 56).opacity(0.3)
+                
+                summaryRow(title: "Active Friends", value: Double(dataService.friends.count), color: .orange, icon: "person.2.fill", isCurrency: false, isLast: true)
             }
-            .padding(20)
-            .background(AppColors.cardBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 20))
-            .shadow(color: AppColors.shadow, radius: 10, x: 0, y: 5)
-            .padding(.horizontal, 20)
+            .glassStyle(cornerRadius: 24)
+            .padding(.horizontal, 24)
         }
     }
     
-    private func summaryRow(title: String, value: Double, color: Color, isCurrency: Bool = true) -> some View {
-        HStack {
+    private func summaryRow(title: String, value: Double, color: Color, icon: String, isCurrency: Bool = true, isLast: Bool = false) -> some View {
+        HStack(spacing: 16) {
+            ZStack {
+                Circle()
+                    .fill(color.opacity(0.12))
+                    .frame(width: 40, height: 40)
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(color)
+            }
+            
             Text(title)
-                .font(AppFonts.body())
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
                 .foregroundColor(AppColors.textSecondary)
+            
             Spacer()
+            
             Text(isCurrency ? CurrencyManager.shared.format(value) : "\(Int(value))")
-                .font(AppFonts.headline())
-                .foregroundColor(color)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(AppColors.textPrimary)
         }
+        .padding(16)
     }
     
     private func emptyState(message: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "chart.bar.xaxis")
-                .font(.system(size: 40))
-                .foregroundColor(AppColors.textTertiary)
+        VStack(spacing: 16) {
+            Image(systemName: "chart.pie.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(AppColors.primary.gradient.opacity(0.3))
             Text(message)
-                .font(AppFonts.body())
+                .font(.system(size: 16, weight: .medium, design: .rounded))
                 .foregroundColor(AppColors.textSecondary)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 200)
-        .background(AppColors.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 24))
-        .padding(.horizontal, 20)
+        .frame(height: 250)
+        .glassStyle(cornerRadius: 30)
+        .padding(.horizontal, 24)
     }
     
     // MARK: - Calculations

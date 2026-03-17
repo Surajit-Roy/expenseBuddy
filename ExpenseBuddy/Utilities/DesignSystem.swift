@@ -203,19 +203,73 @@ struct TextFieldModifier: ViewModifier {
     }
 }
 
-struct GlassBackgroundModifier: ViewModifier {
+struct GlassCardModifier: ViewModifier {
+    @Environment(\.colorScheme) var colorScheme
+    var cornerRadius: CGFloat = 20
+    var opacity: Double = 0.08
+    
     func body(content: Content) -> some View {
         content
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
             .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color.white.opacity(0.08))
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(colorScheme == .light ? AnyShapeStyle(.ultraThinMaterial) : AnyShapeStyle(.ultraThinMaterial))
+                    .opacity(colorScheme == .light ? 0.95 : opacity) // More solid in light mode for better separation
+            )
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .fill(colorScheme == .light ? Color.white.opacity(0.5) : Color.white.opacity(0.02))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(
+                        LinearGradient(
+                            colors: colorScheme == .light 
+                                ? [Color.black.opacity(0.05), Color.clear, Color.black.opacity(0.02)]
+                                : [.white.opacity(0.2), .clear, .white.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
                     )
             )
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .shadow(
+                color: colorScheme == .light ? Color.black.opacity(0.08) : Color.black.opacity(0.3),
+                radius: colorScheme == .light ? 12 : 10,
+                x: 0,
+                y: colorScheme == .light ? 6 : 5
+            )
+    }
+}
+
+struct ModernBackground: View {
+    var body: some View {
+        ZStack {
+            AppColors.background.ignoresSafeArea()
+            
+            // Re-using the logic from SplashView's AmbientGlowView but making it accessible here
+            GeometryReader { proxy in
+                ZStack {
+                    Circle()
+                        .fill(AppColors.primary.opacity(0.1))
+                        .frame(width: 400, height: 400)
+                        .offset(x: -100, y: -100)
+                        .blur(radius: 80)
+                    
+                    Circle()
+                        .fill(AppColors.accent.opacity(0.08))
+                        .frame(width: 350, height: 350)
+                        .offset(x: proxy.size.width - 150, y: proxy.size.height / 2)
+                        .blur(radius: 70)
+                    
+                    Circle()
+                        .fill(Color.purple.opacity(0.08))
+                        .frame(width: 300, height: 300)
+                        .offset(x: 100, y: proxy.size.height - 150)
+                        .blur(radius: 60)
+                }
+            }
+        }
     }
 }
 
@@ -236,8 +290,8 @@ extension View {
         modifier(TextFieldModifier())
     }
     
-    func glassStyle() -> some View {
-        modifier(GlassBackgroundModifier())
+    func glassStyle(cornerRadius: CGFloat = 20, opacity: Double = 0.1) -> some View {
+        modifier(GlassCardModifier(cornerRadius: cornerRadius, opacity: opacity))
     }
 }
 

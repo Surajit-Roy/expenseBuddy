@@ -15,102 +15,138 @@ struct AddFriendView: View {
     @State private var showSuccess = false
     @State private var errorMessage: String?
     
+    @State private var appearAnimate = false
+    
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(spacing: 28) {
-                    // Header icon
-                    ZStack {
-                        Circle()
-                            .fill(AppColors.primaryGradient)
-                            .frame(width: 80, height: 80)
-                        Image(systemName: "person.badge.plus")
-                            .font(.system(size: 32, weight: .medium))
-                            .foregroundColor(.white)
-                    }
-                    .padding(.top, 20)
-                    
-                    Text("Add a Friend")
-                        .font(AppFonts.title2())
-                        .foregroundColor(AppColors.textPrimary)
-                    
-                    // Name field
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Name")
-                            .font(AppFonts.caption())
-                            .fontWeight(.medium)
-                            .foregroundColor(AppColors.textSecondary)
-                        HStack(spacing: 12) {
-                            Image(systemName: "person.fill")
-                                .foregroundColor(AppColors.textTertiary)
-                                .frame(width: 20)
-                            TextField("Friend's name", text: $name)
-                                .textContentType(.name)
-                                .autocapitalization(.words)
-                        }
-                        .textFieldStyle()
-                    }
-                    .padding(.horizontal, 24)
-                    
-                    // Email field
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Email")
-                            .font(AppFonts.caption())
-                            .fontWeight(.medium)
-                            .foregroundColor(AppColors.textSecondary)
-                        HStack(spacing: 12) {
-                            Image(systemName: "envelope.fill")
-                                .foregroundColor(AppColors.textTertiary)
-                                .frame(width: 20)
-                            TextField("friend@example.com", text: $email)
-                                .textContentType(.emailAddress)
-                                .keyboardType(.emailAddress)
-                                .autocapitalization(.none)
-                                .disableAutocorrection(true)
-                        }
-                        .textFieldStyle()
-                        
-                        // Inline email validation hint
-                        if !email.isEmpty && !Validator.isValidEmail(email) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "exclamationmark.circle.fill")
-                                    .font(.system(size: 10))
-                                Text("Enter a valid email address")
-                                    .font(AppFonts.caption())
+            ZStack {
+                ModernBackground()
+                
+                ScrollView {
+                    VStack(spacing: 32) {
+                        // Header
+                        VStack(spacing: 16) {
+                            ZStack {
+                                Circle()
+                                    .fill(AppColors.primary.opacity(0.12))
+                                    .frame(width: 80, height: 80)
+                                Image(systemName: "person.badge.plus.fill")
+                                    .font(.system(size: 36, weight: .medium))
+                                    .foregroundColor(AppColors.primary)
                             }
+                            .shadow(color: AppColors.primary.opacity(0.2), radius: 10, x: 0, y: 5)
+                            
+                            Text("Add a Friend")
+                                .font(.system(size: 28, weight: .bold, design: .rounded))
+                                .foregroundColor(AppColors.textPrimary)
+                        }
+                        .padding(.top, 20)
+                        .offset(y: appearAnimate ? 0 : 20)
+                        .opacity(appearAnimate ? 1 : 0)
+                        
+                        // Name field
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Name")
+                                .font(AppFonts.headline())
+                                .foregroundColor(AppColors.textPrimary)
+                                .padding(.horizontal, 24)
+                            
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.crop.circle")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(AppColors.primary)
+                                TextField("Friend's name", text: $name)
+                                    .font(.system(size: 17, weight: .medium, design: .rounded))
+                                    .textContentType(.name)
+                                    .autocapitalization(.words)
+                            }
+                            .padding(18)
+                            .glassStyle(cornerRadius: 18)
+                            .padding(.horizontal, 24)
+                        }
+                        .offset(y: appearAnimate ? 0 : 20)
+                        .opacity(appearAnimate ? 1 : 0)
+                        
+                        // Email field
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Email Address")
+                                .font(AppFonts.headline())
+                                .foregroundColor(AppColors.textPrimary)
+                                .padding(.horizontal, 24)
+                            
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "envelope.circle")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(AppColors.primary)
+                                    TextField("friend@example.com", text: $email)
+                                        .font(.system(size: 17, weight: .medium, design: .rounded))
+                                        .textContentType(.emailAddress)
+                                        .keyboardType(.emailAddress)
+                                        .autocapitalization(.none)
+                                        .disableAutocorrection(true)
+                                }
+                                .padding(18)
+                                .glassStyle(cornerRadius: 18)
+                                
+                                if !email.isEmpty && !Validator.isValidEmail(email) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "exclamationmark.circle.fill")
+                                            .font(.system(size: 12, weight: .medium))
+                                        Text("Please enter a valid email address")
+                                            .font(.system(size: 13, weight: .medium, design: .rounded))
+                                    }
+                                    .foregroundColor(AppColors.oweRed)
+                                    .padding(.horizontal, 4)
+                                    .transition(.opacity)
+                                }
+                            }
+                            .padding(.horizontal, 24)
+                        }
+                        .offset(y: appearAnimate ? 0 : 20)
+                        .opacity(appearAnimate ? 1 : 0)
+                        
+                        // Error message
+                        if let error = errorMessage {
+                            HStack(spacing: 8) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                Text(error)
+                            }
+                            .font(AppFonts.caption())
                             .foregroundColor(AppColors.oweRed)
-                            .padding(.horizontal, 4)
+                            .padding(.horizontal, 24)
                         }
-                    }
-                    .padding(.horizontal, 24)
-                    
-                    // Error message
-                    if let error = errorMessage {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                            Text(error)
+                        
+                        // Add button
+                        Button(action: addFriend) {
+                            HStack {
+                                Spacer()
+                                Text("Add Friend")
+                                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                                Spacer()
+                            }
+                            .foregroundColor(.white)
+                            .frame(height: 60)
+                            .background(
+                                LinearGradient(colors: [AppColors.primary, AppColors.primary.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                            .shadow(color: AppColors.primary.opacity(0.3), radius: 10, x: 0, y: 5)
                         }
-                        .font(AppFonts.caption())
-                        .foregroundColor(AppColors.oweRed)
                         .padding(.horizontal, 24)
+                        .disabled(!canAdd)
+                        .opacity(canAdd ? 1 : 0.5)
+                        .offset(y: appearAnimate ? 0 : 20)
+                        .opacity(appearAnimate ? 1 : 0)
                     }
-                    
-                    // Add button
-                    Button(action: addFriend) {
-                        Text("Add Friend")
-                    }
-                    .primaryButton()
-                    .padding(.horizontal, 24)
-                    .disabled(!canAdd)
-                    .opacity(canAdd ? 1 : 0.5)
+                    .padding(.bottom, 60)
                 }
-                .padding(.bottom, 40)
             }
-            .background(AppColors.background)
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
-                        .foregroundColor(AppColors.textSecondary)
+                        .foregroundColor(AppColors.textPrimary)
                 }
                 ToolbarItem(placement: .keyboard) {
                     HStack {
@@ -126,6 +162,11 @@ struct AddFriendView: View {
                 Button("Done") { dismiss() }
             } message: {
                 Text("\(name.trimmingCharacters(in: .whitespacesAndNewlines)) has been added to your friends list.")
+            }
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.6)) {
+                    appearAnimate = true
+                }
             }
         }
     }
