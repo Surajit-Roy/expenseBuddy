@@ -58,11 +58,14 @@ struct LoginView: View {
                                     Image(systemName: "envelope.fill")
                                         .foregroundColor(.white.opacity(0.5))
                                         .frame(width: 20)
+                                        .padding(.vertical, 16)
+                                        .padding(.leading, 16)
                                     TextField("", text: $viewModel.email, prompt: Text("Email Address").foregroundColor(.white.opacity(0.3)))
                                         .foregroundColor(.white)
                                         .textContentType(.emailAddress)
                                         .autocapitalization(.none)
                                         .keyboardType(.emailAddress)
+                                        .padding(.trailing, 16)
                                 }
                                 .glassStyle()
                                 
@@ -71,9 +74,12 @@ struct LoginView: View {
                                     Image(systemName: "lock.fill")
                                         .foregroundColor(.white.opacity(0.5))
                                         .frame(width: 20)
+                                        .padding(.vertical, 16)
+                                        .padding(.leading, 16)
                                     SecureField("", text: $viewModel.password, prompt: Text("Password").foregroundColor(.white.opacity(0.3)))
                                         .foregroundColor(.white)
                                         .textContentType(.password)
+                                        .padding(.trailing, 16)
                                 }
                                 .glassStyle()
                             }
@@ -156,6 +162,7 @@ struct LoginView: View {
                         .padding(.bottom, 40)
                         .opacity(appearFooter ? 1 : 0)
                     }
+                    .padding(.horizontal, 16)
                 }
             }
             .navigationDestination(isPresented: $showSignUp) {

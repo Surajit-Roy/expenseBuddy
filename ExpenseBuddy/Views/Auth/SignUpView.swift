@@ -97,6 +97,7 @@ struct SignUpView: View {
                     .padding(.bottom, 40)
                     .opacity(appearFooter ? 1 : 0)
                 }
+                .padding(.horizontal, 16)
             }
         }
         .navigationBarBackButtonHidden(true)
@@ -125,10 +126,13 @@ struct SignUpView: View {
             Image(systemName: icon)
                 .foregroundColor(.white.opacity(0.5))
                 .frame(width: 20)
+                .padding(.vertical, 16)
+                .padding(.leading, 16)
             TextField("", text: text, prompt: Text(placeholder).foregroundColor(.white.opacity(0.3)))
                 .foregroundColor(.white)
                 .keyboardType(keyboardType)
                 .autocapitalization(.none)
+                .padding(.trailing, 16)
         }
         .glassStyle()
     }
@@ -139,8 +143,11 @@ struct SignUpView: View {
             Image(systemName: icon)
                 .foregroundColor(.white.opacity(0.5))
                 .frame(width: 20)
+                .padding(.vertical, 16)
+                .padding(.leading, 16)
             SecureField("", text: text, prompt: Text(placeholder).foregroundColor(.white.opacity(0.3)))
                 .foregroundColor(.white)
+                .padding(.trailing, 16)
         }
         .glassStyle()
     }

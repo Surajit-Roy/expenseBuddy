@@ -53,12 +53,15 @@ struct ForgotPasswordView: View {
                             Image(systemName: "envelope.fill")
                                 .foregroundColor(.white.opacity(0.5))
                                 .frame(width: 20)
+                                .padding(.vertical, 16)
+                                .padding(.leading, 16)
                             
                             TextField("", text: $viewModel.email, prompt: Text("Email Address").foregroundColor(.white.opacity(0.3)))
                                 .foregroundColor(.white)
                                 .textContentType(.emailAddress)
                                 .autocapitalization(.none)
                                 .keyboardType(.emailAddress)
+                                .padding(.trailing, 16)
                         }
                         .glassStyle()
                         
@@ -89,6 +92,7 @@ struct ForgotPasswordView: View {
                 }
                 .opacity(appearContent ? 1 : 0)
                 .offset(y: appearContent ? 0 : 20)
+                .padding(.horizontal, 16)
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
