@@ -91,7 +91,7 @@ struct GroupsListView: View {
                     showCreateGroup = true
                 }
                 .padding(.trailing, 24)
-                .padding(.bottom, 24)
+                .padding(.bottom, 90)
             }
             .navigationTitle("Groups")
             .sheet(isPresented: $showCreateGroup) {

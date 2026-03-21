@@ -11,6 +11,7 @@ struct User: Identifiable, Codable, Hashable {
     var email: String
     var mobileNumber: String? = nil // Optional with default nil
     var profileImage: String // SF Symbol name or URL
+    var fcmToken: String? = nil // FCM device token for push notifications
     var createdAt: Date
     
     var initials: String {

@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		183612732F6E991600DC5043 /* FirebaseMessaging in Frameworks */ = {isa = PBXBuildFile; productRef = 183612722F6E991600DC5043 /* FirebaseMessaging */; };
 		18AE529F2F5AAEBE00F3F9B9 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 18AE529E2F5AAEBE00F3F9B9 /* FirebaseAuth */; };
 		18AE52A12F5AAEC900F3F9B9 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 18AE52A02F5AAEC900F3F9B9 /* FirebaseFirestore */; };
 		18AE52A32F5AAED000F3F9B9 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 18AE52A22F5AAED000F3F9B9 /* FirebaseCore */; };
@@ -74,6 +75,7 @@
 			files = (
 				18AE529F2F5AAEBE00F3F9B9 /* FirebaseAuth in Frameworks */,
 				18AE52A52F5AAED900F3F9B9 /* GoogleSignIn in Frameworks */,
+				183612732F6E991600DC5043 /* FirebaseMessaging in Frameworks */,
 				18AE52A32F5AAED000F3F9B9 /* FirebaseCore in Frameworks */,
 				18AE52A12F5AAEC900F3F9B9 /* FirebaseFirestore in Frameworks */,
 			);
@@ -148,6 +150,7 @@
 				18AE52A02F5AAEC900F3F9B9 /* FirebaseFirestore */,
 				18AE52A22F5AAED000F3F9B9 /* FirebaseCore */,
 				18AE52A42F5AAED900F3F9B9 /* GoogleSignIn */,
+				183612722F6E991600DC5043 /* FirebaseMessaging */,
 			);
 			productName = ExpenseBuddy;
 			productReference = 185D97422F5999C1005140EF /* ExpenseBuddy.app */;
@@ -646,6 +649,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		183612722F6E991600DC5043 /* FirebaseMessaging */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 185D97C12F5AA620005140EF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseMessaging;
+		};
 		18AE529E2F5AAEBE00F3F9B9 /* FirebaseAuth */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 185D97C12F5AA620005140EF /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;

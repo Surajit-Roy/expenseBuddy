@@ -131,16 +131,23 @@ struct FriendDetailView: View {
             .frame(maxWidth: .infinity)
             
             Button(action: {
-                // Remind feature placeholder
+                if balance > 0 {
+                    dataService.notificationService?.sendReminder(
+                        to: friend.id,
+                        friendName: friend.name.components(separatedBy: " ").first ?? friend.name,
+                        amount: balance,
+                        fromUserName: dataService.currentUser.name
+                    )
+                }
             }) {
                 VStack(spacing: 8) {
                     ZStack {
                         Circle()
-                            .fill(AppColors.primary.opacity(0.15))
+                            .fill(balance > 0 ? AppColors.primary.opacity(0.15) : Color.gray.opacity(0.15))
                             .frame(width: 50, height: 50)
                         Image(systemName: "bell.fill")
                             .font(.system(size: 22))
-                            .foregroundColor(AppColors.primary)
+                            .foregroundColor(balance > 0 ? AppColors.primary : Color.gray)
                     }
                     Text("Remind")
                         .font(AppFonts.caption())

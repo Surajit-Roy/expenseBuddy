@@ -24,6 +24,14 @@ class DataService: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private let rebuildSubject = PassthroughSubject<Void, Never>()
     
+    /// Tracks expense IDs already seen so we only notify on truly new ones.
+    private var knownExpenseIds = Set<String>()
+    /// Set to true after the initial snapshot load completes (to suppress notifications on app launch).
+    private var initialExpenseLoadComplete = false
+    
+    /// Notification service for triggering local/in-app notifications.
+    var notificationService: NotificationService?
+    
     init() {
         // Re-render activity feed whenever UserCache updates (names arrive)
         userCache.$cache
@@ -82,6 +90,8 @@ class DataService: ObservableObject {
         expenses = []
         settlements = []
         activities = []
+        knownExpenseIds.removeAll()
+        initialExpenseLoadComplete = false
     }
     
     // MARK: - Firestore Sync (Listeners)
@@ -110,23 +120,49 @@ class DataService: ObservableObject {
             }
             
         // 2. Listen to Expenses where user is a participant (uses flat participantIds array)
+        //    Enhanced with change detection for real-time notifications.
         let expensesListener = db.collection("expenses")
             .whereField("participantIds", arrayContains: userId)
             .addSnapshotListener { [weak self] snapshot, error in
-                guard let self = self, let documents = snapshot?.documents else {
+                guard let self = self, let snapshot = snapshot else {
                     if let error = error { print("Expenses listener error: \(error)") }
                     return
                 }
                 
                 Task {
+                    // Decode all documents
                     let decodedExpenses = await Task.detached(priority: .userInitiated) {
-                        documents.compactMap { try? $0.data(as: Expense.self) }
+                        snapshot.documents.compactMap { try? $0.data(as: Expense.self) }
                     }.value
+                    
+                    // Detect newly added expenses for notifications
+                    let newlyAdded: [Expense] = snapshot.documentChanges
+                        .filter { $0.type == .added }
+                        .compactMap { try? $0.document.data(as: Expense.self) }
                     
                     await MainActor.run {
                         self.expenses = decodedExpenses
                         self.resolveUserIds()
                         self.rebuildActivityFeed()
+                        
+                        // Notify only for genuinely new expenses (not the initial load)
+                        if self.initialExpenseLoadComplete {
+                            for expense in newlyAdded {
+                                // Skip if already known (dedup) or created by self
+                                guard !self.knownExpenseIds.contains(expense.id),
+                                      expense.createdByUserId != userId else { continue }
+                                
+                                let payerName = self.userCache.name(for: expense.paidByUserId)
+                                self.notificationService?.scheduleExpenseNotification(
+                                    expense: expense,
+                                    payerName: payerName
+                                )
+                            }
+                        }
+                        
+                        // Update known set and mark initial load complete
+                        self.knownExpenseIds = Set(decodedExpenses.map { $0.id })
+                        self.initialExpenseLoadComplete = true
                     }
                 }
             }
@@ -198,7 +234,34 @@ class DataService: ObservableObject {
                 }
             }
             
-        listeners.append(contentsOf: [groupsListener, expensesListener, settlementsListener, friendsListener, currentUserListener])
+        // 6. Listen to Reminders for real-time foreground notifications
+        let remindersListener = db.collection("users").document(userId).collection("reminders")
+            .whereField("read", isEqualTo: false)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self, let snapshot = snapshot else { return }
+                
+                // Only trigger notifications for newly added reminders, and ignore initial snapshot dump
+                if self.initialExpenseLoadComplete {
+                    let newlyAdded = snapshot.documentChanges.filter { $0.type == .added }
+                    for change in newlyAdded {
+                        let data = change.document.data()
+                        if let message = data["message"] as? String,
+                           let fromUserId = data["fromUserId"] as? String,
+                           fromUserId != userId {
+                            
+                            Task { @MainActor in
+                                self.notificationService?.publishInAppNotification(
+                                    title: "⏰ Reminder",
+                                    body: message,
+                                    expenseId: nil
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            
+        listeners.append(contentsOf: [groupsListener, expensesListener, settlementsListener, friendsListener, currentUserListener, remindersListener])
     }
     
     // MARK: - User ID Resolution

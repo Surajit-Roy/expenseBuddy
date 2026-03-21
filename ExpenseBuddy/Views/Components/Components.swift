@@ -275,15 +275,18 @@ struct FloatingActionButton: View {
     let action: () -> Void
     
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            action()
+        }) {
             ZStack {
                 Circle()
                     .fill(AppColors.primaryGradient)
-                    .frame(width: 60, height: 60)
-                    .shadow(color: AppColors.primary.opacity(0.4), radius: 12, x: 0, y: 6)
+                    .frame(width: 64, height: 64)
+                    .shadow(color: AppColors.primary.opacity(0.3), radius: 15, x: 0, y: 8)
                 
                 Image(systemName: icon)
-                    .font(.system(size: 24, weight: .semibold))
+                    .font(.system(size: 26, weight: .bold))
                     .foregroundColor(.white)
             }
         }
