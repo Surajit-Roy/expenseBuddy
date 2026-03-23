@@ -103,10 +103,10 @@ struct ForgotPasswordView: View {
                     .foregroundColor(.white.opacity(0.7))
                 }
             }
-            .alert("Email Sent", isPresented: $viewModel.showSuccessAlert) {
+            .alert("Reset Link Sent", isPresented: $viewModel.showSuccessAlert) {
                 Button("OK") { dismiss() }
             } message: {
-                Text("Check your email for a password reset link.")
+                Text("We've sent a password reset link to your email address. If you don't see it within a few minutes, please check your spam folder.")
             }
             .onAppear {
                 withAnimation(.easeOut(duration: 0.6)) {

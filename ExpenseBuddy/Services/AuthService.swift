@@ -266,18 +266,52 @@ class AuthService: ObservableObject {
         isLoading = true
         errorMessage = nil
         
-        guard Validator.isValidEmail(email) else {
-            errorMessage = "Please enter a valid email address."
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedEmail.isEmpty {
+            self.errorMessage = "Please enter your email address."
+            isLoading = false
+            return false
+        }
+        
+        guard Validator.isValidEmail(trimmedEmail) else {
+            self.errorMessage = "Please enter a valid email address."
             isLoading = false
             return false
         }
         
         do {
-            try await Auth.auth().sendPasswordReset(withEmail: email)
+            // 1. Check if the user is actually registered
+            let methods = try await Auth.auth().fetchSignInMethods(forEmail: trimmedEmail)
+            
+            if methods.isEmpty {
+                self.errorMessage = "We couldn't find an account matching that email address."
+                isLoading = false
+                return false
+            }
+            
+            // 2. If they only use Google, they don't have a password to reset
+            if methods.contains("google.com") && !methods.contains("password") {
+                self.errorMessage = "This account uses Google Sign-In. Please continue with Google to access your account."
+                isLoading = false
+                return false
+            }
+            
+            // 3. User is valid, send the email
+            try await Auth.auth().sendPasswordReset(withEmail: trimmedEmail)
             isLoading = false
             return true
-        } catch {
-            self.errorMessage = error.localizedDescription
+        } catch let error as NSError {
+            if error.domain == AuthErrorDomain {
+                if error.code == AuthErrorCode.userNotFound.rawValue {
+                    self.errorMessage = "No account found with this email address."
+                } else if error.code == AuthErrorCode.invalidEmail.rawValue {
+                    self.errorMessage = "Please enter a valid email address."
+                } else {
+                    self.errorMessage = error.localizedDescription
+                }
+            } else {
+                self.errorMessage = error.localizedDescription
+            }
             isLoading = false
             return false
         }

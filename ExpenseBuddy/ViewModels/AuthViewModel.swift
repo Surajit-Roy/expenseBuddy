@@ -52,10 +52,22 @@ class AuthViewModel: ObservableObject {
     }
     
     func resetPassword() {
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        guard !trimmedEmail.isEmpty else {
+            errorMessage = "Please enter your email address to continue."
+            return
+        }
+        
+        guard Validator.isValidEmail(trimmedEmail) else {
+            errorMessage = "Please enter a valid email address."
+            return
+        }
+        
         Task {
             isLoading = true
             errorMessage = nil
-            let success = await authService.resetPassword(email: email)
+            let success = await authService.resetPassword(email: trimmedEmail)
             isLoading = false
             if success {
                 showSuccessAlert = true
