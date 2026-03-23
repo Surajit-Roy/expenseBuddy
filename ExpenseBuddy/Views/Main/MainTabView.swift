@@ -10,10 +10,9 @@ struct MainTabView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var dataService: DataService
     @EnvironmentObject var notificationService: NotificationService
+    @EnvironmentObject var router: NavigationRouter
     @State private var selectedTab = 0
     @State private var showAddExpense = false
-    @State private var navigateToExpense: Expense?
-    @State private var showExpenseDetail = false
     
     init() {
         // Robust fix for hiding native tab bar
@@ -47,22 +46,13 @@ struct MainTabView: View {
             .ignoresSafeArea(.keyboard, edges: .bottom)
             
             // Custom Dock-style Tab Bar
-            customTabBar
-            
-            // Hidden NavigationLink for deep-link navigation from notifications
-            NavigationLink(
-                destination: Group {
-                    if let expense = navigateToExpense {
-                        ExpenseDetailView(expense: expense, currentUserId: dataService.currentUser.id)
-                            .environmentObject(dataService)
-                            .environmentObject(CurrencyManager.shared)
-                    }
-                },
-                isActive: $showExpenseDetail,
-                label: { EmptyView() }
-            )
-            .hidden()
+            if router.isRoot(for: selectedTab) {
+                customTabBar
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(1)
+            }
         }
+        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: router.isRoot(for: selectedTab))
         .sheet(isPresented: $showAddExpense) {
             AddExpenseView()
                 .environmentObject(CurrencyManager.shared)
@@ -85,10 +75,8 @@ struct MainTabView: View {
             if let expense = dataService.expenses.first(where: { $0.id == expenseId }) {
                 // Switch to Activity tab and navigate to expense detail
                 selectedTab = 2
-                navigateToExpense = expense
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    showExpenseDetail = true
-                }
+                // Append to path for programmatic navigation
+                router.activityPath.append(expense)
                 notificationService.clearPendingNavigation()
             } else {
                 notificationService.clearPendingNavigation()

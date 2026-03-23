@@ -8,6 +8,7 @@ import Combine
 
 struct GroupsListView: View {
     @EnvironmentObject var dataService: DataService
+    @EnvironmentObject var router: NavigationRouter
     @State private var searchText = ""
     @State private var showCreateGroup = false
     @State private var showDeleteError = false
@@ -25,7 +26,7 @@ struct GroupsListView: View {
     }
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $router.groupsPath) {
             ZStack(alignment: .bottomTrailing) {
                 AppColors.background.ignoresSafeArea()
                 
@@ -64,7 +65,7 @@ struct GroupsListView: View {
                         } else {
                             LazyVStack(spacing: 12) {
                                 ForEach(filteredGroups) { group in
-                                    NavigationLink(destination: GroupDetailView(groupId: group.id)) {
+                                    NavigationLink(value: group.id) {
                                         GroupCard(group: group, balance: dataService.groupBalance(group))
                                     }
                                 }
@@ -94,6 +95,9 @@ struct GroupsListView: View {
                 .padding(.bottom, 90)
             }
             .navigationTitle("Groups")
+            .navigationDestination(for: String.self) { groupId in
+                GroupDetailView(groupId: groupId)
+            }
             .sheet(isPresented: $showCreateGroup) {
                 CreateGroupView()
             }

@@ -5,7 +5,7 @@
 
 import Foundation
 
-struct Expense: Identifiable, Codable {
+struct Expense: Identifiable, Codable, Hashable {
     let id: String
     var title: String
     var amount: Double
@@ -21,13 +21,13 @@ struct Expense: Identifiable, Codable {
     var updatedAt: Date?
 }
 
-struct ExpenseSplit: Identifiable, Codable {
+struct ExpenseSplit: Identifiable, Codable, Hashable {
     var id: String { userId }
     var userId: String
     var amountOwed: Double
 }
 
-enum SplitType: String, Codable, CaseIterable {
+enum SplitType: String, Codable, CaseIterable, Hashable {
     case equal = "Equal"
     case unequal = "Unequal"
     case percentage = "Percentage"
@@ -43,7 +43,7 @@ enum SplitType: String, Codable, CaseIterable {
     }
 }
 
-enum ExpenseCategory: String, Codable, CaseIterable {
+enum ExpenseCategory: String, Codable, CaseIterable, Hashable {
     case food = "Food & Drink"
     case transport = "Transport"
     case shopping = "Shopping"

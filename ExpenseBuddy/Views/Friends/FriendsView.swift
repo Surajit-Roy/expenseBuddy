@@ -8,6 +8,7 @@ import Combine
 
 struct FriendsView: View {
     @EnvironmentObject var dataService: DataService
+    @EnvironmentObject var router: NavigationRouter
     @State private var searchText = ""
     @State private var showAddFriend = false
     
@@ -20,7 +21,7 @@ struct FriendsView: View {
     }
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $router.friendsPath) {
             ZStack {
                 AppColors.background.ignoresSafeArea()
                 
@@ -59,7 +60,7 @@ struct FriendsView: View {
                         } else {
                             LazyVStack(spacing: 0) {
                                 ForEach(filteredFriends) { friend in
-                                    NavigationLink(destination: FriendDetailView(friend: friend)) {
+                                    NavigationLink(value: friend) {
                                         friendRow(friend)
                                     }
                                     
@@ -79,6 +80,9 @@ struct FriendsView: View {
                 }
             }
             .navigationTitle("Friends")
+            .navigationDestination(for: User.self) { friend in
+                FriendDetailView(friend: friend)
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showAddFriend = true }) {

@@ -6,23 +6,31 @@
 import SwiftUI
 import Combine
 
+enum ProfileDestination: Hashable {
+    case detail(User)
+    case help
+    case chart
+    case privacy
+}
+
 struct ProfileView: View {
     @Binding var selectedTab: Int
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var dataService: DataService
+    @EnvironmentObject var router: NavigationRouter
     @State private var showLogoutAlert = false
     @AppStorage("isDarkMode") private var isDarkMode = false
     @AppStorage("currencySymbol") private var currencySymbol = "₹"
     @AppStorage("notificationsEnabled") private var notificationsEnabled = true
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $router.profilePath) {
             ZStack {
                 AppColors.background.ignoresSafeArea()
                 
                 ScrollView {
                     VStack(spacing: 24) {
-                        NavigationLink(destination: ProfileDetailView(user: dataService.currentUser)) {
+                        NavigationLink(value: ProfileDestination.detail(dataService.currentUser)) {
                             profileCard
                         }
                         .buttonStyle(PlainButtonStyle())
@@ -36,6 +44,18 @@ struct ProfileView: View {
                 }
             }
             .navigationTitle("Profile")
+            .navigationDestination(for: ProfileDestination.self) { destination in
+                switch destination {
+                case .detail(let user):
+                    ProfileDetailView(user: user)
+                case .help:
+                    HelpSupportView()
+                case .chart:
+                    FriendsExpenseChartView()
+                case .privacy:
+                    PrivacyPolicyView()
+                }
+            }
             .alert("Log Out", isPresented: $showLogoutAlert) {
                 Button("Cancel", role: .cancel) { }
                 Button("Log Out", role: .destructive) { authService.logout() }
@@ -192,21 +212,21 @@ struct ProfileView: View {
             .padding(.vertical, 10)
             
             Divider().padding(.leading, 52)
-            NavigationLink(destination: HelpSupportView()) {
+            NavigationLink(value: ProfileDestination.help) {
                 settingRow(icon: "questionmark.circle.fill", title: "Help & Support", color: .blue)
             }
             .buttonStyle(PlainButtonStyle())
             
             Divider().padding(.leading, 52)
             
-            NavigationLink(destination: FriendsExpenseChartView()) {
+            NavigationLink(value: ProfileDestination.chart) {
                 settingRow(icon: "chart.pie.fill", title: "Friends Expenses Chart", color: .purple)
             }
             .buttonStyle(PlainButtonStyle())
             
             Divider().padding(.leading, 52)
             
-            NavigationLink(destination: PrivacyPolicyView()) {
+            NavigationLink(value: ProfileDestination.privacy) {
                 settingRow(icon: "shield.fill", title: "Privacy Policy", color: .gray)
             }
             .buttonStyle(PlainButtonStyle())

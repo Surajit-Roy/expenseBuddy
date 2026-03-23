@@ -9,9 +9,10 @@ import Combine
 struct ActivityView: View {
     @EnvironmentObject var dataService: DataService
     @EnvironmentObject var currencyManager: CurrencyManager
+    @EnvironmentObject var router: NavigationRouter
     
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $router.activityPath) {
             ZStack {
                 AppColors.background.ignoresSafeArea()
                 
@@ -36,7 +37,7 @@ struct ActivityView: View {
                                             if item.type == .expenseAdded, 
                                                let expenseId = item.relatedExpenseId,
                                                let expense = dataService.expenses.first(where: { $0.id == expenseId }) {
-                                                NavigationLink(destination: ExpenseDetailView(expense: expense, currentUserId: dataService.currentUser.id)) {
+                                                NavigationLink(value: expense) {
                                                     activityRow(item)
                                                 }
                                                 .buttonStyle(PlainButtonStyle())
@@ -64,6 +65,9 @@ struct ActivityView: View {
                 }
             }
             .navigationTitle("Activity")
+            .navigationDestination(for: Expense.self) { expense in
+                ExpenseDetailView(expense: expense, currentUserId: dataService.currentUser.id)
+            }
         }
     }
     

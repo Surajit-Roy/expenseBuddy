@@ -51,6 +51,7 @@ struct ExpenseBuddyApp: App {
     @StateObject private var authService = AuthService()
     @StateObject private var dataService = DataService()
     @StateObject private var notificationService = NotificationService()
+    @StateObject private var navigationRouter = NavigationRouter()
     @AppStorage("isDarkMode") private var isDarkMode = false
     @State private var showSplash = true
     
@@ -66,6 +67,7 @@ struct ExpenseBuddyApp: App {
                         .environmentObject(authService)
                         .environmentObject(dataService)
                         .environmentObject(notificationService)
+                        .environmentObject(navigationRouter)
                         .environmentObject(CurrencyManager.shared)
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
@@ -76,6 +78,7 @@ struct ExpenseBuddyApp: App {
                         .environmentObject(authService)
                         .environmentObject(dataService)
                         .environmentObject(notificationService)
+                        .environmentObject(navigationRouter)
                         .environmentObject(CurrencyManager.shared)
                         .transition(.asymmetric(
                             insertion: .move(edge: .leading).combined(with: .opacity),
