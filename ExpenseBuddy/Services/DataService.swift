@@ -601,6 +601,29 @@ class DataService: ObservableObject {
         }
     }
     
+    /// Checks if the current user has any outstanding balances
+    /// Returns true if they owe or are owed money, preventing profile deletion.
+    func hasOutstandingBalances() -> Bool {
+        // 1. Check overall balance first (quick check for net non-zero)
+        if abs(overallBalance()) > 0.01 { return true }
+        
+        // 2. Check individual friend balances
+        for friend in friends {
+            if abs(balanceWithFriend(friend.id)) > 0.01 { return true }
+        }
+        
+        // 3. Check group balances directly
+        for group in groups {
+            let entries = groupBalanceEntries(group)
+            if let myEntry = entries.first(where: { $0.fromUserId == currentUser.id || $0.toUserId == currentUser.id }),
+               abs(myEntry.amount) > 0.01 {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
     func balanceWithFriend(_ friendId: String) -> Double {
         ExpenseCalculator.balanceBetween(
             currentUserId: currentUser.id,

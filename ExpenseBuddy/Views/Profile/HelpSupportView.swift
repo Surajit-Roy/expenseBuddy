@@ -52,16 +52,24 @@ struct HelpSupportView: View {
                             answer: "Go to the Friends tab, tap the '+' icon in the top right, and search for their email address. If they use ExpenseBuddy, they will be added seamlessly."
                         )
                         faqRow(
-                            question: "How are group balances calculated?",
-                            answer: "ExpenseBuddy uses a smart debt simplification algorithm to ensure you pay the minimum number of transactions possible within a group."
+                            question: "How are balances calculated?",
+                            answer: "ExpenseBuddy automatically calculates who owes who. In groups, it balances all shared expenses, ensuring you clearly see your total outstanding balance across all transactions."
                         )
                         faqRow(
                             question: "Can I settle up outside a group?",
                             answer: "Yes! If you settle up from the Friends tab, your payment will automatically distribute across all shared groups where you owe that person."
                         )
                         faqRow(
+                            question: "Can I send reminders for pending balances?",
+                            answer: "Yes! You can send push notification reminders to friends who owe you money by tapping the 'Remind' button on their balance details page."
+                        )
+                        faqRow(
                             question: "How do I change my currency?",
                             answer: "You can change your default display currency right here in the Settings section of your Profile tab."
+                        )
+                        faqRow(
+                            question: "I forgot my password, how can I reset it?",
+                            answer: "On the login screen, tap 'Forgot Password?'. Enter your registered email address, and we will send you a secure link to reset your password."
                         )
                     }
                     .padding(.horizontal, 20)

@@ -10,22 +10,22 @@ struct PrivacyPolicyView: View {
     
     let policyText = """
     **1. Information We Collect**
-    When you use ExpenseBuddy, we collect information you provide directly to us, such as your name, email address, profile picture, and any expense or group data you create. Authentication is securely handled via Firebase.
+    When you use ExpenseBuddy, we collect information you provide directly to us, including your name, email address, profile picture, and any expense, group, or friend data you create. Authentication is securely handled via Firebase. We also collect device tokens for delivering push notifications (Reminders) about pending balances.
 
     **2. How We Use Your Information**
-    We use the information we collect to provide, maintain, and improve our services. Specifically, your data is used to calculate shared expenses, sync groups across your devices, and match your email address with friends using the app.
+    Your data is used to calculate shared expenses, synchronize groups and balances across your devices, match your email address with friends, and deliver important push notifications regarding new expenses and settlement reminders.
 
     **3. Data Storage and Security**
-    Your data is stored securely on Google Firestore. All rules strictly prohibit unauthorized access. You can only view groups and expenses that you are explicitly a participant or member of.
+    Your data is stored securely in the cloud using Google Firestore. We employ strict security rules to prohibit unauthorized access. You can only view groups, expenses, and friend connections that you are explicitly a participant in.
 
     **4. Sharing Your Information**
-    We do not sell, trade, or rent your personal identification information to others. Your email address and name are only visible to your friends and participants in the groups you join.
+    We do not sell, trade, or rent your personal information to third parties. Your email address, name, and profile picture are only visible to your added friends and participants in the groups you join.
 
-    **5. Data Deletion**
-    You have the right to request deletion of your account and associated data at any time. Because this is a shared expense app, deleting an account may anonymize your previous splits in groups to preserve ledger integrity for others.
+    **5. Account & Data Deletion**
+    You have the right to request the deletion of your account at any time. To preserve financial integrity within shared groups, you cannot delete your profile if you have any outstanding balances (owed or owing). Once all balances are fully settled, you may delete your account. Upon deletion, your personal authentication data is removed, and your previous interactions in shared groups and expenses are anonymized to preserve the ledger history for remaining members.
 
     **6. Changes to this Policy**
-    We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.
+    We may update our Privacy Policy periodically. We will notify you of significant changes by posting the new Privacy Policy within the app.
     """
     
     var body: some View {
@@ -57,7 +57,7 @@ struct PrivacyPolicyView: View {
                 
                 // Policy Content
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Last Updated: October 2026")
+                    Text("Last Updated: April 2026")
                         .font(AppFonts.caption())
                         .foregroundColor(AppColors.textSecondary)
                     

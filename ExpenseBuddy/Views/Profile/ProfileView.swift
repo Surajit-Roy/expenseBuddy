@@ -19,6 +19,9 @@ struct ProfileView: View {
     @EnvironmentObject var dataService: DataService
     @EnvironmentObject var router: NavigationRouter
     @State private var showLogoutAlert = false
+    @State private var showDeleteProfileAlert = false
+    @State private var showCannotDeleteProfileAlert = false
+    @State private var showErrorAlert = false
     @AppStorage("isDarkMode") private var isDarkMode = false
     @AppStorage("currencySymbol") private var currencySymbol = "₹"
     @AppStorage("notificationsEnabled") private var notificationsEnabled = true
@@ -38,9 +41,20 @@ struct ProfileView: View {
                         statsSection
                         settingsSection
                         logoutButton
+                        deleteProfileButton
                         appInfo
                     }
                     .padding(.bottom, 100)
+                }
+                
+                if authService.isLoading {
+                    ZStack {
+                        Color.black.opacity(0.4).ignoresSafeArea()
+                        ProgressView("Deleting Profile...")
+                            .padding()
+                            .background(Color(.systemBackground))
+                            .cornerRadius(10)
+                    }
                 }
             }
             .navigationTitle("Profile")
@@ -61,6 +75,29 @@ struct ProfileView: View {
                 Button("Log Out", role: .destructive) { authService.logout() }
             } message: {
                 Text("Are you sure you want to log out?")
+            }
+            .alert("Cannot Delete Profile", isPresented: $showCannotDeleteProfileAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text("You cannot delete your profile because you have pending expenses. Please settle all balances first.")
+            }
+            .alert("Delete Profile", isPresented: $showDeleteProfileAlert) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    Task {
+                        let success = await authService.deleteProfile()
+                        if !success && authService.errorMessage != nil {
+                            showErrorAlert = true
+                        }
+                    }
+                }
+            } message: {
+                Text("Are you sure you want to delete your profile? This action cannot be undone and will remove all your data.")
+            }
+            .alert("Error", isPresented: $showErrorAlert) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(authService.errorMessage ?? "An unknown error occurred.")
             }
         }
     }
@@ -273,11 +310,36 @@ struct ProfileView: View {
                 Text("Log Out")
                     .font(AppFonts.headline())
             }
+            .foregroundColor(AppColors.textSecondary)
+            .frame(maxWidth: .infinity)
+            .frame(height: 56)
+            .background(AppColors.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: AppColors.shadow, radius: 4, x: 0, y: 2)
+        }
+        .padding(.horizontal, 20)
+    }
+    
+    private var deleteProfileButton: some View {
+        Button(action: {
+            if dataService.hasOutstandingBalances() {
+                showCannotDeleteProfileAlert = true
+            } else {
+                showDeleteProfileAlert = true
+            }
+        }) {
+            HStack(spacing: 10) {
+                Image(systemName: "trash")
+                    .font(.system(size: 16, weight: .semibold))
+                Text("Delete Profile")
+                    .font(AppFonts.headline())
+            }
             .foregroundColor(AppColors.oweRed)
             .frame(maxWidth: .infinity)
             .frame(height: 56)
             .background(AppColors.oweRed.opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(color: AppColors.shadow, radius: 4, x: 0, y: 2)
         }
         .padding(.horizontal, 20)
     }

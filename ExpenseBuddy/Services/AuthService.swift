@@ -212,6 +212,76 @@ class AuthService: ObservableObject {
         }
     }
     
+    // MARK: - Delete Profile
+    
+    func deleteProfile() async -> Bool {
+        isLoading = true
+        errorMessage = nil
+        
+        guard let user = Auth.auth().currentUser else {
+            errorMessage = "No authenticated user found."
+            isLoading = false
+            return false
+        }
+        
+        let uid = user.uid
+        
+        // 1. Backup user document to prevent desync if Auth deletion fails
+        let userRef = db.collection("users").document(uid)
+        var backupData: [String: Any]? = nil
+        if let doc = try? await userRef.getDocument(), doc.exists {
+            backupData = doc.data()
+        }
+        
+        do {
+            // 2. Delete subcollections (friends, reminders)
+            let friendsRef = userRef.collection("friends")
+            let friendsSnapshot = try? await friendsRef.getDocuments()
+            
+            let remindersRef = userRef.collection("reminders")
+            let remindersSnapshot = try? await remindersRef.getDocuments()
+            
+            // Delete main user document first because doing it after Auth deletion may fail due to security rules
+            try await userRef.delete()
+            
+            if let docs = friendsSnapshot?.documents {
+                for doc in docs { try? await doc.reference.delete() }
+            }
+            if let docs = remindersSnapshot?.documents {
+                for doc in docs { try? await doc.reference.delete() }
+            }
+            
+            // 3. Delete user from Firebase Auth
+            // If this throws requiresRecentLogin, the catch block will restore the Firestore data
+            try await user.delete()
+            
+            // 4. Clear local session
+            GIDSignIn.sharedInstance.signOut()
+            DispatchQueue.main.async {
+                self.currentUser = nil
+                self.isAuthenticated = false
+            }
+            
+            isLoading = false
+            return true
+            
+        } catch let error as NSError {
+            // ROLLBACK: Restore Firestore data since Auth deletion failed
+            if let backupData = backupData {
+                try? await userRef.setData(backupData)
+            }
+            
+            isLoading = false
+            
+            if error.domain == AuthErrorDomain, error.code == AuthErrorCode.requiresRecentLogin.rawValue {
+                self.errorMessage = "For security reasons, Firebase requires a recent login to delete an account. Please Log Out and Log In again, then try deleting."
+            } else {
+                self.errorMessage = error.localizedDescription
+            }
+            return false
+        }
+    }
+    
     // MARK: - Sign in with Google
     
     #if canImport(UIKit)
