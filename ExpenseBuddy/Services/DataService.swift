@@ -50,6 +50,13 @@ class DataService: ObservableObject {
             }
             .store(in: &cancellables)
         
+        // Refresh activity feed when currency changes
+        CurrencyManager.shared.objectWillChange
+            .sink { [weak self] _ in
+                self?.rebuildActivityFeed()
+            }
+            .store(in: &cancellables)
+        
         Auth.auth().addStateDidChangeListener { [weak self] auth, user in
             guard let self = self else { return }
             if let user = user {
