@@ -16,11 +16,25 @@ class AuthViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var showSuccessAlert = false
+    @Published var hasAcceptedTerms = false
     
     let authService: AuthService
     
     init(authService: AuthService) {
         self.authService = authService
+    }
+    
+    var isSignUpValid: Bool {
+        !name.isEmpty && 
+        Validator.isValidEmail(email) && 
+        !mobileNumber.isEmpty && 
+        Validator.isValidPassword(password).valid && 
+        password == confirmPassword && 
+        hasAcceptedTerms
+    }
+    
+    var isLoginValid: Bool {
+        !email.isEmpty && !password.isEmpty
     }
     
     func login() {

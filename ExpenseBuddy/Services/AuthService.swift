@@ -53,6 +53,7 @@ class AuthService: ObservableObject {
                     email: data["email"] as? String ?? "",
                     mobileNumber: data["mobileNumber"] as? String ?? "",
                     profileImage: data["profileImage"] as? String ?? "person.circle.fill",
+                    hasAcceptedTerms: data["hasAcceptedTerms"] as? Bool ?? false,
                     createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
                 )
                 self.currentUser = user
@@ -157,6 +158,7 @@ class AuthService: ObservableObject {
                 email: email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
                 mobileNumber: trimmedMobile,
                 profileImage: "person.circle.fill",
+                hasAcceptedTerms: true,
                 createdAt: Date()
             )
             
@@ -194,6 +196,7 @@ class AuthService: ObservableObject {
             "email": user.email,
             "mobileNumber": user.mobileNumber,
             "profileImage": user.profileImage,
+            "hasAcceptedTerms": user.hasAcceptedTerms,
             "createdAt": Timestamp(date: user.createdAt)
         ]
         try await db.collection("users").document(uid).setData(userData)
@@ -317,6 +320,7 @@ class AuthService: ObservableObject {
                     email: result.user.profile?.email ?? "",
                     mobileNumber: "",
                     profileImage: "person.circle.fill",
+                    hasAcceptedTerms: true,
                     createdAt: Date()
                 )
                 try await createUserDocument(user: user, uid: uid)

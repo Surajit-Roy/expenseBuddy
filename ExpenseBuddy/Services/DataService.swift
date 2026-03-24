@@ -582,6 +582,24 @@ class DataService: ObservableObject {
         }
     }
     
+    func updateTermsAcceptance(accepted: Bool) async {
+        let userId = currentUser.id
+        guard !userId.isEmpty else { return }
+        
+        do {
+            try await db.collection("users").document(userId).updateData([
+                "hasAcceptedTerms": accepted
+            ])
+            
+            var updatedUser = currentUser
+            updatedUser.hasAcceptedTerms = accepted
+            currentUser = updatedUser
+            userCache.seed(currentUser)
+        } catch {
+            print("Error updating terms acceptance: \(error)")
+        }
+    }
+    
     // MARK: - Queries
     
     func expensesForGroup(_ groupId: String) -> [Expense] {

@@ -51,6 +51,12 @@ struct MainTabView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(1)
             }
+            
+            // Mandatory T&C Overlay for existing users
+            if !dataService.currentUser.id.isEmpty && !dataService.currentUser.hasAcceptedTerms {
+                TermsAcceptanceOverlay()
+                    .zIndex(100) // Ensure it's on top of everything
+            }
         }
         .animation(.spring(response: 0.35, dampingFraction: 0.85), value: router.isRoot(for: selectedTab))
         .sheet(isPresented: $showAddExpense) {

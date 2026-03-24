@@ -9,6 +9,7 @@ struct SignUpView: View {
     @State private var appearHeader = false
     @State private var appearForm = false
     @State private var appearFooter = false
+    @State private var showTerms = false
     
     init(authService: AuthService) {
         _viewModel = StateObject(wrappedValue: AuthViewModel(authService: authService))
@@ -60,6 +61,14 @@ struct SignUpView: View {
                             authSecureField(icon: "lock.fill", placeholder: "Confirm Password", text: $viewModel.confirmPassword)
                         }
                         
+                        CheckboxField(
+                            isChecked: $viewModel.hasAcceptedTerms,
+                            label: "I agree to the",
+                            linkText: "Terms & Conditions",
+                            onLinkTap: { showTerms = true }
+                        )
+                        .padding(.top, 4)
+                        
                         if let error = viewModel.errorMessage {
                             Text(error)
                                 .font(.system(size: 13, weight: .medium, design: .rounded))
@@ -76,7 +85,8 @@ struct SignUpView: View {
                             }
                         }
                         .primaryButton()
-                        .disabled(viewModel.isLoading)
+                        .disabled(viewModel.isLoading || !viewModel.isSignUpValid)
+                        .opacity(viewModel.isSignUpValid ? 1 : 0.6)
                         .padding(.top, 12)
                     }
                     .padding(.horizontal, 24)
@@ -99,6 +109,9 @@ struct SignUpView: View {
                 }
                 .padding(.horizontal, 16)
             }
+        }
+        .sheet(isPresented: $showTerms) {
+            TermsAndConditionsView()
         }
         .navigationBarBackButtonHidden(true)
         .toolbar {
