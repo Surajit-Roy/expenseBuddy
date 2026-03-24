@@ -53,6 +53,7 @@ class AuthService: ObservableObject {
                     email: data["email"] as? String ?? "",
                     mobileNumber: data["mobileNumber"] as? String ?? "",
                     profileImage: data["profileImage"] as? String ?? "person.circle.fill",
+                    fcmToken: data["fcmToken"] as? String,
                     hasAcceptedTerms: data["hasAcceptedTerms"] as? Bool ?? false,
                     createdAt: (data["createdAt"] as? Timestamp)?.dateValue() ?? Date()
                 )
@@ -194,8 +195,9 @@ class AuthService: ObservableObject {
             "id": uid,
             "name": user.name,
             "email": user.email,
-            "mobileNumber": user.mobileNumber,
+            "mobileNumber": user.mobileNumber ?? "",
             "profileImage": user.profileImage,
+            "fcmToken": user.fcmToken ?? "",
             "hasAcceptedTerms": user.hasAcceptedTerms,
             "createdAt": Timestamp(date: user.createdAt)
         ]

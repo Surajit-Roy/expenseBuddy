@@ -96,10 +96,13 @@ class UserCache: ObservableObject {
                     return
                 }
                 
-                if let user = try? document.data(as: User.self) {
+                do {
+                    let user = try document.data(as: User.self)
                     Task { @MainActor in
                         self.cache[user.id] = user
                     }
+                } catch {
+                    print("❌ UserCache: Decoding error for \(id): \(error)")
                 }
             }
             

@@ -115,7 +115,14 @@ class DataService: ObservableObject {
                 
                 Task {
                     let decodedGroups = await Task.detached(priority: .userInitiated) {
-                        documents.compactMap { try? $0.data(as: ExpenseGroup.self) }
+                        documents.compactMap { doc in
+                            do {
+                                return try doc.data(as: ExpenseGroup.self)
+                            } catch {
+                                print("❌ Group decoding error for \(doc.documentID): \(error)")
+                                return nil
+                            }
+                        }
                     }.value
                     
                     await MainActor.run {
@@ -139,7 +146,14 @@ class DataService: ObservableObject {
                 Task {
                     // Decode all documents
                     let decodedExpenses = await Task.detached(priority: .userInitiated) {
-                        snapshot.documents.compactMap { try? $0.data(as: Expense.self) }
+                        snapshot.documents.compactMap { doc in
+                            do {
+                                return try doc.data(as: Expense.self)
+                            } catch {
+                                print("❌ Expense decoding error for \(doc.documentID): \(error)")
+                                return nil
+                            }
+                        }
                     }.value
                     
                     // Detect newly added expenses for notifications
@@ -185,7 +199,14 @@ class DataService: ObservableObject {
                 
                 Task {
                     let decodedSettlements = await Task.detached(priority: .userInitiated) {
-                        documents.compactMap { try? $0.data(as: Settlement.self) }
+                        documents.compactMap { doc in
+                            do {
+                                return try doc.data(as: Settlement.self)
+                            } catch {
+                                print("❌ Settlement decoding error for \(doc.documentID): \(error)")
+                                return nil
+                            }
+                        }
                     }.value
                     
                     await MainActor.run {
@@ -206,7 +227,14 @@ class DataService: ObservableObject {
                 
                 Task {
                     let decodedFriends = await Task.detached(priority: .userInitiated) {
-                        documents.compactMap { try? $0.data(as: User.self) }
+                        documents.compactMap { doc in
+                            do {
+                                return try doc.data(as: User.self)
+                            } catch {
+                                print("❌ Friend decoding error for \(doc.documentID): \(error)")
+                                return nil
+                            }
+                        }
                     }.value
                     
                     await MainActor.run {
