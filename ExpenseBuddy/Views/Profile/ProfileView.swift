@@ -345,14 +345,41 @@ struct ProfileView: View {
     }
     
     private var appInfo: some View {
-        VStack(spacing: 4) {
-            Text("ExpenseBuddy v1.0")
-                .font(AppFonts.caption())
-                .foregroundColor(AppColors.textTertiary)
-            Text("Made with ❤️")
-                .font(AppFonts.caption2())
-                .foregroundColor(AppColors.textTertiary)
+        VStack(spacing: 16) {
+            // Subtle Divider with Icon
+            HStack {
+                Rectangle()
+                    .fill(AppColors.textTertiary.opacity(0.2))
+                    .frame(height: 1)
+                
+                Image(systemName: "bolt.ring.closed")
+                    .font(.system(size: 14, weight: .light))
+                    .foregroundColor(AppColors.textTertiary.opacity(0.5))
+                    .padding(.horizontal, 8)
+                
+                Rectangle()
+                    .fill(AppColors.textTertiary.opacity(0.2))
+                    .frame(height: 1)
+            }
+            .padding(.horizontal, 60)
+            
+            VStack(spacing: 8) {
+                Text("EXPENSEBUDDY")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .kerning(2.0)
+                    .foregroundColor(AppColors.textSecondary)
+                
+                    Text("Version 1.0.0")
+                        .font(.system(.caption2, design: .monospaced))
+                        .foregroundColor(AppColors.textTertiary.opacity(0.8))
+            }
+            
+            Text("© 2026 ExpenseBuddy Team • Made with ❤️")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(AppColors.textTertiary.opacity(0.6))
         }
-        .padding(.top, 8)
+        .padding(.top, 10)
+        .padding(.bottom, 20)
+        .frame(maxWidth: .infinity)
     }
 }
