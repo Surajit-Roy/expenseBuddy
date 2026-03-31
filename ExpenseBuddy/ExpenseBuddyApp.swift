@@ -115,6 +115,11 @@ struct ExpenseBuddyApp: App {
                 
                 // Request notification permission on first launch
                 notificationService.requestPermission()
+                
+                // Auto-create any past-due recurring expenses
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                    dataService.checkAndCreateDueExpenses()
+                }
             }
         }
     }

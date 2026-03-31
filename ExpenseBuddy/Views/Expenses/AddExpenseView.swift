@@ -12,6 +12,9 @@ struct AddExpenseView: View {
     @StateObject private var viewModel: ExpenseViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showSuccess = false
+    @State private var showReceiptScanner = false
+    @State private var isRecurring = false
+    @State private var recurringFrequency: RecurrenceFrequency = .monthly
     
     @State private var appearAnimate = false
     
@@ -26,6 +29,13 @@ struct AddExpenseView: View {
                 
                 ScrollView {
                     VStack(spacing: 32) {
+                        // Scan Receipt Button (Premium)
+                        if PremiumManager.shared.isPremiumEnabled {
+                            scanReceiptButton
+                                .offset(y: appearAnimate ? 0 : 15)
+                                .opacity(appearAnimate ? 1 : 0)
+                        }
+                        
                         // Amount Section (Always first)
                         amountSection
                             .offset(y: appearAnimate ? 0 : 20)
@@ -48,6 +58,11 @@ struct AddExpenseView: View {
                             }
                             
                             noteSection
+                            
+                            // Make Recurring section (Premium)
+                            if PremiumManager.shared.isPremiumEnabled {
+                                recurringSection
+                            }
                             
                             if let error = viewModel.errorMessage {
                                 HStack(spacing: 8) {
@@ -100,14 +115,107 @@ struct AddExpenseView: View {
             } message: {
                 Text("\"\(viewModel.title)\" has been added successfully.")
             }
+            .sheet(isPresented: $showReceiptScanner) {
+                ReceiptScannerView(
+                    onComplete: { title, total, splits in
+                        applyScannedReceipt(title: title, total: total, splits: splits)
+                    },
+                    participants: viewModel.availableMembers
+                )
+            }
         }
     }
     
     private func saveExpense() {
-        if viewModel.addExpense() {
+        if let seedExpenseId = viewModel.addExpense() {
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.success)
+            
+            // If recurring is enabled, also create a recurring expense
+            if isRecurring, let dataService = viewModel.dataService {
+                let splits = viewModel.calculateSplits().map { split in
+                    ExpenseSplit(
+                        userId: split.userId,
+                        amountOwed: CurrencyManager.shared.convertToINR(split.amountOwed)
+                    )
+                }
+                
+                var nextDate = Date()
+                switch recurringFrequency {
+                case .weekly:
+                    nextDate = Calendar.current.date(byAdding: .weekOfYear, value: 1, to: nextDate) ?? nextDate
+                case .monthly:
+                    nextDate = Calendar.current.date(byAdding: .month, value: 1, to: nextDate) ?? nextDate
+                case .yearly:
+                    nextDate = Calendar.current.date(byAdding: .year, value: 1, to: nextDate) ?? nextDate
+                }
+                
+                var initialStatuses: [String: ApprovalStatus] = [:]
+                for pid in viewModel.selectedParticipantIds {
+                    initialStatuses[pid] = (pid == dataService.currentUser.id) ? .approved : .pending
+                }
+                
+                let recurring = RecurringExpense(
+                    id: UUID().uuidString,
+                    title: viewModel.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                    amount: CurrencyManager.shared.convertToINR(viewModel.amount),
+                    paidByUserId: viewModel.paidByUserId,
+                    participantIds: Array(viewModel.selectedParticipantIds),
+                    splitType: viewModel.splitType,
+                    splits: splits,
+                    groupId: viewModel.groupId ?? "",
+                    category: viewModel.selectedCategory,
+                    note: viewModel.note,
+                    frequency: recurringFrequency,
+                    nextDueDate: nextDate,
+                    isActive: true,
+                    createdByUserId: dataService.currentUser.id,
+                    createdAt: Date(),
+                    participantStatuses: initialStatuses,
+                    seedExpenseId: seedExpenseId
+                )
+                dataService.addRecurringExpense(recurring)
+            }
+            
             showSuccess = true
+        }
+    }
+    
+    // MARK: - Scan Receipt
+    
+    private var scanReceiptButton: some View {
+        Button(action: { showReceiptScanner = true }) {
+            HStack(spacing: 10) {
+                Image(systemName: "doc.text.viewfinder")
+                    .font(.system(size: 18, weight: .semibold))
+                Text("Scan Receipt")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .foregroundColor(AppColors.primary)
+            .padding(16)
+            .background(AppColors.primary.opacity(0.1))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(AppColors.primary.opacity(0.3), lineWidth: 1)
+            )
+        }
+        .padding(.horizontal, 24)
+        .padding(.top, 8)
+    }
+    
+    private func applyScannedReceipt(title: String, total: Double, splits: [String: Double]) {
+        viewModel.title = title
+        viewModel.amountText = String(format: "%.2f", total)
+        viewModel.splitType = .exact
+        
+        // Set exact amounts from scanning
+        for (userId, amount) in splits {
+            viewModel.unequalAmounts[userId] = String(format: "%.2f", amount)
+            viewModel.selectedParticipantIds.insert(userId)
         }
     }
     
@@ -499,6 +607,68 @@ struct AddExpenseView: View {
             .padding(18)
             .glassStyle(cornerRadius: 18)
             .padding(.horizontal, 24)
+        }
+    }
+    
+    // MARK: - Recurring Section
+    
+    private var recurringSection: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.clockwise.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundStyle(AppColors.primaryGradient)
+                
+                Text("Make Recurring")
+                    .font(AppFonts.headline())
+                    .foregroundColor(AppColors.textPrimary)
+                
+                Spacer()
+                
+                Toggle("", isOn: $isRecurring)
+                    .tint(AppColors.primary)
+            }
+            .padding(.horizontal, 24)
+            
+            if isRecurring {
+                HStack(spacing: 10) {
+                    ForEach(RecurrenceFrequency.allCases, id: \.self) { freq in
+                        frequencyButton(for: freq)
+                    }
+                }
+                .padding(.horizontal, 24)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func frequencyButton(for freq: RecurrenceFrequency) -> some View {
+        let isSelected = recurringFrequency == freq
+        Button(action: { recurringFrequency = freq }) {
+            VStack(spacing: 6) {
+                Image(systemName: freq.icon)
+                    .font(.system(size: 16))
+                Text(freq.rawValue)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(
+                Group {
+                    if isSelected {
+                        AppColors.primary.opacity(0.15)
+                    } else {
+                        Color.clear.background(.ultraThinMaterial)
+                    }
+                }
+            )
+            .foregroundColor(isSelected ? AppColors.primary : AppColors.textSecondary)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(isSelected ? AppColors.primary.opacity(0.5) : Color.clear, lineWidth: 1)
+            )
         }
     }
 }

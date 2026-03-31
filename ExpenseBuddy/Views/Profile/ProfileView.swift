@@ -11,6 +11,8 @@ enum ProfileDestination: Hashable {
     case help
     case chart
     case privacy
+    case budget
+    case recurring
 }
 
 struct ProfileView: View {
@@ -68,6 +70,10 @@ struct ProfileView: View {
                     FriendsExpenseChartView()
                 case .privacy:
                     PrivacyPolicyView()
+                case .budget:
+                    BudgetView()
+                case .recurring:
+                    RecurringExpenseView()
                 }
             }
             .alert("Log Out", isPresented: $showLogoutAlert) {
@@ -257,9 +263,25 @@ struct ProfileView: View {
             Divider().padding(.leading, 52)
             
             NavigationLink(value: ProfileDestination.chart) {
-                settingRow(icon: "chart.pie.fill", title: "Friends Expenses Chart", color: .purple)
+                settingRow(icon: "chart.pie.fill", title: "Spending Insights", color: .purple)
             }
             .buttonStyle(PlainButtonStyle())
+            
+            if PremiumManager.shared.isPremiumEnabled {
+                Divider().padding(.leading, 52)
+                
+                NavigationLink(value: ProfileDestination.budget) {
+                    settingRow(icon: "chart.bar.fill", title: "Spending Budgets", color: .mint)
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                Divider().padding(.leading, 52)
+                
+                NavigationLink(value: ProfileDestination.recurring) {
+                    settingRow(icon: "arrow.clockwise.circle.fill", title: "Recurring Expenses", color: .indigo)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
             
             Divider().padding(.leading, 52)
             

@@ -11,6 +11,8 @@ struct FriendDetailView: View {
     @EnvironmentObject var dataService: DataService
     @State private var showSettleUp = false
     @State private var showRemoveAlert = false
+    @State private var showShareSheet = false
+    @State private var pdfURL: URL?
     @Environment(\.dismiss) private var dismiss
     
     private var balance: Double {
@@ -57,6 +59,11 @@ struct FriendDetailView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
+                    if PremiumManager.shared.isPremiumEnabled {
+                        Button(action: { exportPDF() }) {
+                            Label("Export PDF", systemImage: "doc.richtext")
+                        }
+                    }
                     Button(role: .destructive, action: { showRemoveAlert = true }) {
                         Label("Remove Friend", systemImage: "person.badge.minus")
                     }
@@ -84,6 +91,11 @@ struct FriendDetailView: View {
                 Text("Are you sure you want to remove \(friend.name)? This won't delete shared expenses.")
             } else {
                 Text("You cannot remove a friend with an outstanding balance. Please settle up first.")
+            }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let url = pdfURL {
+                ShareSheet(activityItems: [url])
             }
         }
     }
@@ -236,6 +248,19 @@ struct FriendDetailView: View {
                 .shadow(color: AppColors.shadow, radius: 6, x: 0, y: 2)
                 .padding(.horizontal, 20)
             }
+        }
+    }
+    
+    private func exportPDF() {
+        pdfURL = PDFExporter.generateFriendReport(
+            friendName: friend.name,
+            expenses: sharedExpenses,
+            balance: balance,
+            currencyManager: CurrencyManager.shared,
+            userCache: dataService.userCache
+        )
+        if pdfURL != nil {
+            showShareSheet = true
         }
     }
 }

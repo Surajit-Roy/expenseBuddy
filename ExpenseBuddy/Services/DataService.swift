@@ -15,6 +15,8 @@ class DataService: ObservableObject {
     @Published var expenses: [Expense] = []
     @Published var settlements: [Settlement] = []
     @Published var activities: [ActivityItem] = []
+    @Published var recurringExpenses: [RecurringExpense] = []
+    @Published var budgets: [Budget] = []
     @Published var currentUser: User = User(id: "", name: "", email: "", profileImage: "", createdAt: Date())
     
     let userCache = UserCache()
@@ -97,6 +99,8 @@ class DataService: ObservableObject {
         expenses = []
         settlements = []
         activities = []
+        recurringExpenses = []
+        budgets = []
         knownExpenseIds.removeAll()
         initialExpenseLoadComplete = false
     }
@@ -296,7 +300,41 @@ class DataService: ObservableObject {
                 }
             }
             
-        listeners.append(contentsOf: [groupsListener, expensesListener, settlementsListener, friendsListener, currentUserListener, remindersListener])
+        // 7. Listen to Recurring Expenses
+        let recurringListener = db.collection("recurringExpenses")
+            .whereField("participantIds", arrayContains: userId)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self, let documents = snapshot?.documents else { return }
+                Task {
+                    let decoded = await Task.detached(priority: .userInitiated) {
+                        documents.compactMap { doc in
+                            try? doc.data(as: RecurringExpense.self)
+                        }
+                    }.value
+                    await MainActor.run {
+                        self.recurringExpenses = decoded.sorted { $0.nextDueDate < $1.nextDueDate }
+                    }
+                }
+            }
+
+        // 8. Listen to Budgets
+        let budgetsListener = db.collection("budgets")
+            .whereField("userId", isEqualTo: userId)
+            .addSnapshotListener { [weak self] snapshot, error in
+                guard let self = self, let documents = snapshot?.documents else { return }
+                Task {
+                    let decoded = await Task.detached(priority: .userInitiated) {
+                        documents.compactMap { doc in
+                            try? doc.data(as: Budget.self)
+                        }
+                    }.value
+                    await MainActor.run {
+                        self.budgets = decoded
+                    }
+                }
+            }
+
+        listeners.append(contentsOf: [groupsListener, expensesListener, settlementsListener, friendsListener, currentUserListener, remindersListener, recurringListener, budgetsListener])
     }
     
     // MARK: - User ID Resolution
@@ -339,9 +377,17 @@ class DataService: ObservableObject {
         
         for expense in expenses {
             let payerName = userCache.name(for: expense.paidByUserId)
+            var subtitleText = "\(payerName) paid \(CurrencyManager.shared.format(expense.amount))"
+            
+            if expense.note?.hasPrefix("[Auto]") == true {
+                subtitleText = "🔄 Recurring generated: " + subtitleText
+            } else if recurringExpenses.contains(where: { $0.seedExpenseId == expense.id }) {
+                subtitleText = "🔄 Setup recurring: " + subtitleText
+            }
+            
             items.append(ActivityItem(
                 id: "act_\(expense.id)", type: .expenseAdded, title: expense.title,
-                subtitle: "\(payerName) paid \(CurrencyManager.shared.format(expense.amount))",
+                subtitle: subtitleText,
                 amount: expense.amount, date: expense.createdAt,
                 involvedUserIds: expense.participantIds,
                 groupName: groupName(for: expense.groupId),
@@ -776,6 +822,160 @@ class DataService: ObservableObject {
         return order.compactMap { key in
             guard let items = grouped[key] else { return nil }
             return (key, items.sorted { $0.date > $1.date })
+        }
+    }
+    
+    // MARK: - Recurring Expense CRUD
+    
+    func addRecurringExpense(_ recurring: RecurringExpense) {
+        do {
+            try db.collection("recurringExpenses").document(recurring.id).setData(from: recurring)
+        } catch {
+            print("Failed to add recurring expense: \(error)")
+        }
+    }
+    
+    func deleteRecurringExpense(_ id: String) {
+        db.collection("recurringExpenses").document(id).delete()
+    }
+    
+    func toggleRecurringExpense(_ recurring: RecurringExpense) {
+        db.collection("recurringExpenses").document(recurring.id).updateData([
+            "isActive": !recurring.isActive
+        ])
+    }
+    
+    func updateRecurringExpenseApprovalStatus(recurringId: String, userId: String, status: ApprovalStatus) {
+        db.collection("recurringExpenses").document(recurringId).updateData([
+            "participantStatuses.\(userId)": status.rawValue
+        ])
+    }
+    
+    func declineRecurringExpense(_ recurring: RecurringExpense, userId: String) {
+        var updated = recurring
+        
+        // 1. Remove their split and subtract their amount from the total
+        if let splitIndex = updated.splits.firstIndex(where: { $0.userId == userId }) {
+            let splitAmount = updated.splits[splitIndex].amountOwed
+            updated.amount = max(0, updated.amount - splitAmount)
+            updated.splits.remove(at: splitIndex)
+        }
+        
+        // 2. Remove them from participants lists
+        updated.participantIds.removeAll(where: { $0 == userId })
+        updated.participantStatuses?[userId] = nil
+        
+        // 3. Save the completely updated expense back to Firestore
+        do {
+            try db.collection("recurringExpenses").document(updated.id).setData(from: updated)
+        } catch {
+            print("Failed to decline/remove user from recurring expense: \(error)")
+        }
+        
+        // 4. Remove them from the connected "Seed" expense (so it settles them up in Friends/Groups)
+        if let seedExpenseId = recurring.seedExpenseId,
+           var seedExpense = expenses.first(where: { $0.id == seedExpenseId }) {
+            
+            if let seedSplitIndex = seedExpense.splits.firstIndex(where: { $0.userId == userId }) {
+                let splitAmount = seedExpense.splits[seedSplitIndex].amountOwed
+                seedExpense.amount = max(0, seedExpense.amount - splitAmount)
+                seedExpense.splits.remove(at: seedSplitIndex)
+            }
+            
+            seedExpense.participantIds.removeAll(where: { $0 == userId })
+            
+            do {
+                try db.collection("expenses").document(seedExpense.id).setData(from: seedExpense)
+            } catch {
+                print("Failed to update seed expense when declining: \(error)")
+            }
+        }
+    }
+    
+    /// Called on app launch — creates actual expenses for any past-due recurring expenses.
+    func checkAndCreateDueExpenses() {
+        let now = Date()
+        for var recurring in recurringExpenses {
+            guard recurring.isActive && recurring.nextDueDate <= now else { continue }
+            
+            // Generate expense only if all participants have approved (none are pending or declined)
+            let requiresApproval = recurring.participantIds.contains { pid in
+                recurring.participantStatuses?[pid] != .approved
+            }
+            guard !requiresApproval else { continue }
+            
+            // Create the actual expense from the recurring template
+            let expense = Expense(
+                id: UUID().uuidString,
+                title: recurring.title,
+                amount: recurring.amount,
+                paidByUserId: recurring.paidByUserId,
+                participantIds: recurring.participantIds,
+                splitType: recurring.splitType,
+                splits: recurring.splits,
+                groupId: recurring.groupId,
+                category: recurring.category,
+                note: "[Auto] \(recurring.note ?? "")",
+                createdByUserId: recurring.createdByUserId,
+                createdAt: recurring.nextDueDate,
+                updatedAt: nil
+            )
+            addExpense(expense)
+            
+            // Advance to next due date
+            recurring.advanceToNextDueDate()
+            do {
+                try db.collection("recurringExpenses").document(recurring.id).setData(from: recurring)
+            } catch {
+                print("Failed to update recurring expense date: \(error)")
+            }
+        }
+    }
+    
+    // MARK: - Budget CRUD
+    
+    func addBudget(_ budget: Budget) {
+        do {
+            try db.collection("budgets").document(budget.id).setData(from: budget)
+        } catch {
+            print("Failed to add budget: \(error)")
+        }
+    }
+    
+    func deleteBudget(_ id: String) {
+        db.collection("budgets").document(id).delete()
+    }
+    
+    /// Calculates how much has been spent this month against a budget.
+    func budgetSpending(for budget: Budget) -> Double {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now))!
+        
+        let monthExpenses = expenses.filter { expense in
+            // Must be in the current month
+            guard expense.createdAt >= startOfMonth else { return false }
+            
+            // Must involve the current user
+            guard expense.participantIds.contains(currentUser.id) else { return false }
+            
+            // Filter by group if the budget is group-specific
+            if let groupId = budget.groupId {
+                guard expense.groupId == groupId else { return false }
+            }
+            
+            // Filter by category if the budget is category-specific
+            if let category = budget.category {
+                guard expense.category == category else { return false }
+            }
+            
+            return true
+        }
+        
+        // Sum up the user's share of each expense
+        return monthExpenses.reduce(0.0) { total, expense in
+            let userSplit = expense.splits.first { $0.userId == currentUser.id }?.amountOwed ?? 0
+            return total + userSplit
         }
     }
 }

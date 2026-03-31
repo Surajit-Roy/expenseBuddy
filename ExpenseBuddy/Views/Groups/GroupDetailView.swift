@@ -14,6 +14,8 @@ struct GroupDetailView: View {
     @State private var showSettleUp = false
     @State private var showDeleteGroupAlert = false
     @State private var showSimplifiedDebts = false
+    @State private var showShareSheet = false
+    @State private var pdfURL: URL?
     @Environment(\.dismiss) private var dismiss
     
     private var group: ExpenseGroup? {
@@ -87,6 +89,11 @@ struct GroupDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
+                        if PremiumManager.shared.isPremiumEnabled {
+                            Button(action: { exportPDF() }) {
+                                Label("Export PDF", systemImage: "doc.richtext")
+                            }
+                        }
                         Button(role: .destructive, action: { showDeleteGroupAlert = true }) {
                             Label("Delete Group", systemImage: "trash")
                         }
@@ -117,6 +124,11 @@ struct GroupDetailView: View {
                     Text("This will delete the group and all its expenses. This cannot be undone.")
                 } else {
                     Text("You cannot delete a group with unsettled balances. Please settle up all balances first.")
+                }
+            }
+            .sheet(isPresented: $showShareSheet) {
+                if let url = pdfURL {
+                    ShareSheet(activityItems: [url])
                 }
             }
         } else {
@@ -352,4 +364,31 @@ struct GroupDetailView: View {
         case .other: return .gray
         }
     }
+    
+    private func exportPDF() {
+        guard let group else { return }
+        pdfURL = PDFExporter.generateGroupReport(
+            group: group,
+            expenses: groupExpenses,
+            settlements: dataService.settlements,
+            balance: groupBalance,
+            currencyManager: CurrencyManager.shared,
+            userCache: dataService.userCache
+        )
+        if pdfURL != nil {
+            showShareSheet = true
+        }
+    }
+}
+
+// MARK: - Share Sheet
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }

@@ -152,40 +152,40 @@ class ExpenseViewModel: ObservableObject {
     
     // MARK: - Save
     
-    func addExpense() -> Bool {
+    func addExpense() -> String? {
         guard let dataService else {
             errorMessage = "Service not available."
-            return false
+            return nil
         }
         
         // Group validation
         guard groupId != nil else {
             errorMessage = "Please select a group."
-            return false
+            return nil
         }
         
         // Title validation
         if let err = titleError {
             errorMessage = err
-            return false
+            return nil
         }
         
         // Amount validation
         if let err = amountError {
             errorMessage = err
-            return false
+            return nil
         }
         
         // Participants validation
         if let err = participantsError {
             errorMessage = err
-            return false
+            return nil
         }
         
         // Payer validation
         if let err = payerError {
             errorMessage = err
-            return false
+            return nil
         }
         
         // Split validation
@@ -194,10 +194,10 @@ class ExpenseViewModel: ObservableObject {
             case .equal: break
             case .unequal, .exact:
                 errorMessage = "Split amounts must add up to \(CurrencyManager.shared.format(amount))."
-                return false
+                return nil
             case .percentage:
                 errorMessage = "Percentages must add up to 100%."
-                return false
+                return nil
             }
         }
         
@@ -231,6 +231,6 @@ class ExpenseViewModel: ObservableObject {
         
         dataService.addExpense(expense)
         errorMessage = nil
-        return true
+        return expense.id
     }
 }
