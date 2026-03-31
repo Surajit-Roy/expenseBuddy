@@ -20,6 +20,7 @@ struct ProfileView: View {
     @EnvironmentObject var authService: AuthService
     @EnvironmentObject var dataService: DataService
     @EnvironmentObject var router: NavigationRouter
+    @EnvironmentObject var premiumManager: PremiumManager
     @State private var showLogoutAlert = false
     @State private var showDeleteProfileAlert = false
     @State private var showCannotDeleteProfileAlert = false
@@ -42,6 +43,12 @@ struct ProfileView: View {
                         
                         statsSection
                         settingsSection
+                        
+                        if !premiumManager.isPremiumEnabled {
+                            PremiumBannerView(style: .large)
+                                .padding(.horizontal, 20)
+                        }
+                        
                         logoutButton
                         deleteProfileButton
                         appInfo
@@ -267,7 +274,7 @@ struct ProfileView: View {
             }
             .buttonStyle(PlainButtonStyle())
             
-            if PremiumManager.shared.isPremiumEnabled {
+            if premiumManager.isPremiumEnabled {
                 Divider().padding(.leading, 52)
                 
                 NavigationLink(value: ProfileDestination.budget) {

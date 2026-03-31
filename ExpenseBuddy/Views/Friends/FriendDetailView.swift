@@ -9,6 +9,7 @@ import Combine
 struct FriendDetailView: View {
     let friend: User
     @EnvironmentObject var dataService: DataService
+    @EnvironmentObject var premiumManager: PremiumManager
     @State private var showSettleUp = false
     @State private var showRemoveAlert = false
     @State private var showShareSheet = false
@@ -48,6 +49,11 @@ struct FriendDetailView: View {
                     sharedGroupsSection
                 }
                 
+                if !premiumManager.isPremiumEnabled {
+                    PremiumBannerView(style: .compact, featureName: "Export PDF Reports", iconName: "doc.richtext")
+                        .padding(.horizontal, 20)
+                }
+                
                 // Shared expenses
                 sharedExpensesSection
             }
@@ -59,7 +65,7 @@ struct FriendDetailView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
-                    if PremiumManager.shared.isPremiumEnabled {
+                    if premiumManager.isPremiumEnabled {
                         Button(action: { exportPDF() }) {
                             Label("Export PDF", systemImage: "doc.richtext")
                         }

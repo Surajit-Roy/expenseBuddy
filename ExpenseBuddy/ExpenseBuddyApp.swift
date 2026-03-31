@@ -69,6 +69,7 @@ struct ExpenseBuddyApp: App {
                         .environmentObject(notificationService)
                         .environmentObject(navigationRouter)
                         .environmentObject(CurrencyManager.shared)
+                        .environmentObject(PremiumManager.shared)
                         .transition(.asymmetric(
                             insertion: .move(edge: .trailing).combined(with: .opacity),
                             removal: .move(edge: .leading).combined(with: .opacity)
@@ -80,6 +81,7 @@ struct ExpenseBuddyApp: App {
                         .environmentObject(notificationService)
                         .environmentObject(navigationRouter)
                         .environmentObject(CurrencyManager.shared)
+                        .environmentObject(PremiumManager.shared)
                         .transition(.asymmetric(
                             insertion: .move(edge: .leading).combined(with: .opacity),
                             removal: .move(edge: .trailing).combined(with: .opacity)

@@ -10,6 +10,7 @@ struct GroupDetailView: View {
     let groupId: String
     @EnvironmentObject var dataService: DataService
     @EnvironmentObject var currencyManager: CurrencyManager
+    @EnvironmentObject var premiumManager: PremiumManager
     @State private var showAddExpense = false
     @State private var showSettleUp = false
     @State private var showDeleteGroupAlert = false
@@ -68,6 +69,11 @@ struct GroupDetailView: View {
                         
                         membersSection(group)
                         
+                        if !premiumManager.isPremiumEnabled {
+                            PremiumBannerView(style: .compact, featureName: "Export PDF Reports", iconName: "doc.richtext")
+                                .padding(.horizontal, 20)
+                        }
+                        
                         expensesSection
                     }
                     .padding(.bottom, 100)
@@ -89,7 +95,7 @@ struct GroupDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
-                        if PremiumManager.shared.isPremiumEnabled {
+                        if premiumManager.isPremiumEnabled {
                             Button(action: { exportPDF() }) {
                                 Label("Export PDF", systemImage: "doc.richtext")
                             }

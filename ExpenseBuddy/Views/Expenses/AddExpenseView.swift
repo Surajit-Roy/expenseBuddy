@@ -9,6 +9,7 @@ import Combine
 struct AddExpenseView: View {
     @EnvironmentObject var dataService: DataService
     @EnvironmentObject var currencyManager: CurrencyManager
+    @EnvironmentObject var premiumManager: PremiumManager
     @StateObject private var viewModel: ExpenseViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showSuccess = false
@@ -30,8 +31,14 @@ struct AddExpenseView: View {
                 ScrollView {
                     VStack(spacing: 32) {
                         // Scan Receipt Button (Premium)
-                        if PremiumManager.shared.isPremiumEnabled {
+                        if premiumManager.isPremiumEnabled {
                             scanReceiptButton
+                                .offset(y: appearAnimate ? 0 : 15)
+                                .opacity(appearAnimate ? 1 : 0)
+                        } else {
+                            PremiumBannerView(style: .compact, featureName: "AI Receipt Scanner", iconName: "doc.text.viewfinder")
+                                .padding(.horizontal, 24)
+                                .padding(.top, 8)
                                 .offset(y: appearAnimate ? 0 : 15)
                                 .opacity(appearAnimate ? 1 : 0)
                         }
@@ -62,6 +69,9 @@ struct AddExpenseView: View {
                             // Make Recurring section (Premium)
                             if PremiumManager.shared.isPremiumEnabled {
                                 recurringSection
+                            } else {
+                                PremiumBannerView(style: .compact, featureName: "Recurring Expenses", iconName: "arrow.clockwise.circle.fill")
+                                    .padding(.horizontal, 24)
                             }
                             
                             if let error = viewModel.errorMessage {
