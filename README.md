@@ -1,6 +1,6 @@
 # 🚀 ExpenseBuddy: Smart Expense Tracking Made Easy
 
-![ExpenseBuddy Banner](file:///Users/surajitr/.gemini/antigravity/brain/fde223e3-295a-46c5-93e3-5bd09c6482fd/expensebuddy_banner_1775028744417.png)
+![ExpenseBuddy Banner](./docs/assets/banner.png)
 
 **ExpenseBuddy** is a premium iOS application designed to take the awkwardness and complex math out of sharing expenses with friends. Built with **SwiftUI** and powered by **Firebase**, it provides a seamless, real-time experience for splitting bills, managing groups, and settling debts.
 
