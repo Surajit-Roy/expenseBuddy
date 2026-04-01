@@ -1,149 +1,146 @@
+const {onDocumentCreated} = require("firebase-functions/v2/firestore");
+const {getMessaging} = require("firebase-admin/messaging");
+const {initializeApp} = require("firebase-admin/app");
+const {getFirestore} = require("firebase-admin/firestore");
+
+initializeApp();
+
 /**
- * Firebase Cloud Function — ExpenseBuddy Push Notifications
- *
- * Triggers when a new expense document is created in Firestore.
- * Sends an FCM push notification to all participants (except the creator).
- *
- * Deploy: `firebase deploy --only functions`
- *
- * Prerequisites:
- * 1. `npm install firebase-admin firebase-functions` in /functions
- * 2. APNs key uploaded to Firebase Console → Project Settings → Cloud Messaging
+ * Sends a push notification to participants when a new expense is created.
  */
+exports.notifyOnExpenseCreated = onDocumentCreated({
+    document: "expenses/{expenseId}",
+    region: "asia-south1"
+}, async (event) => {
+    const expense = event.data.data();
+    if (!expense) return;
 
-const functions = require("firebase-functions");
-const admin = require("firebase-admin");
+    const db = getFirestore();
+    const messaging = getMessaging();
 
-admin.initializeApp();
-const db = admin.firestore();
+    // Fetch the creator's name
+    const creatorDoc = await db.collection("users").doc(expense.createdByUserId).get();
+    const creatorName = creatorDoc.exists ? creatorDoc.data().name : "Someone";
 
-exports.notifyExpenseParticipants = functions.firestore
-  .document("expenses/{expenseId}")
-  .onCreate(async (snap, context) => {
-    const expense = snap.data();
-    const creatorId = expense.createdByUserId;
+    const title = "💰 New Expense Added";
+    const body = `${creatorName} added "${expense.title}" for ${expense.amount}`;
     const participantIds = expense.participantIds || [];
-    const payerName = await getUserName(expense.paidByUserId);
 
-    // Build the notification payload
-    const notification = {
-      title: "💰 New Expense Added",
-      body: `${payerName} added "${expense.title}" for ₹${expense.amount.toFixed(2)}`,
-    };
+    // Filter out the creator to avoid notifying self
+    const notifyUserIds = participantIds.filter(id => id !== expense.createdByUserId);
 
-    // Collect FCM tokens for all participants except the creator
+    if (notifyUserIds.length === 0) return;
+
+    // Fetch tokens for all participants
     const tokens = [];
-    for (const userId of participantIds) {
-      if (userId === creatorId) continue; // Don't notify the creator
+    console.log(`Searching for tokens for ${notifyUserIds.length} users: ${notifyUserIds.join(", ")}`);
+    
+    const userDocs = await Promise.all(
+        notifyUserIds.map(id => db.collection("users").doc(id).get())
+    );
 
-      const userDoc = await db.collection("users").doc(userId).get();
-      if (userDoc.exists) {
-        const fcmToken = userDoc.data().fcmToken;
-        if (fcmToken) {
-          tokens.push(fcmToken);
+    userDocs.forEach(doc => {
+        if (doc.exists) {
+            const userData = doc.data();
+            // Handle both new array format and legacy single string format
+            if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+                tokens.push(...userData.fcmTokens);
+            } else if (userData.fcmToken) {
+                tokens.push(userData.fcmToken);
+            }
+        } else {
+            console.warn(`User document not found for ID: ${doc.id}`);
         }
-      }
-    }
+    });
+
+    console.log(`Found ${tokens.length} total tokens to notify.`);
 
     if (tokens.length === 0) {
-      console.log("No FCM tokens found for participants.");
-      return null;
+        console.warn("No valid FCM tokens found for any participants. Skipping notification.");
+        return;
     }
 
-    // Send push notifications
     const message = {
-      notification,
-      data: {
-        expenseId: context.params.expenseId,
-        type: "expense_added",
-      },
-      tokens,
+        notification: {
+            title: title,
+            body: body,
+        },
+        data: {
+            expenseId: expense.id,
+            type: "expense_added"
+        },
+        tokens: tokens,
     };
 
     try {
-      const response = await admin.messaging().sendEachForMulticast(message);
-      console.log(
-        `Sent ${response.successCount} notifications, ${response.failureCount} failures.`
-      );
-
-      // Clean up invalid tokens
-      response.responses.forEach((resp, idx) => {
-        if (
-          resp.error &&
-          (resp.error.code === "messaging/invalid-registration-token" ||
-            resp.error.code === "messaging/registration-token-not-registered")
-        ) {
-          // Remove stale token from Firestore
-          const staleUserId = participantIds.filter(
-            (id) => id !== creatorId
-          )[idx];
-          if (staleUserId) {
-            db.collection("users")
-              .doc(staleUserId)
-              .update({ fcmToken: admin.firestore.FieldValue.delete() });
-          }
+        const response = await messaging.sendEachForMulticast(message);
+        console.log(`Notification result: Successfully sent ${response.successCount} messages; ${response.failureCount} errors.`);
+        
+        // Log individual errors if any
+        if (response.failureCount > 0) {
+            response.responses.forEach((resp, idx) => {
+                if (!resp.success) {
+                    console.error(`Token at index ${idx} failed: ${resp.error.message}`);
+                }
+            });
         }
-      });
     } catch (error) {
-      console.error("Error sending notifications:", error);
+        console.error("Error sending message:", error);
     }
-
-    return null;
-  });
+});
 
 /**
- * Helper: Fetches a user's display name from Firestore.
+ * Sends a push notification when a reminder is sent to a friend.
  */
-async function getUserName(userId) {
-  try {
-    const doc = await db.collection("users").doc(userId).get();
-    return doc.exists ? doc.data().name || "Someone" : "Someone";
-  } catch {
-    return "Someone";
-  }
-}
+exports.notifyOnReminderCreated = onDocumentCreated({
+    document: "users/{userId}/reminders/{reminderId}",
+    region: "asia-south1"
+}, async (event) => {
+    const reminder = event.data.data();
+    if (!reminder) return;
 
-exports.notifyReminder = functions.firestore
-  .document("users/{userId}/reminders/{reminderId}")
-  .onCreate(async (snap, context) => {
-    const reminder = snap.data();
-    const toUserId = context.params.userId;
+    console.log(`Processing reminder for user: ${event.params.userId}`);
 
-    const userDoc = await db.collection("users").doc(toUserId).get();
-    if (!userDoc.exists || !userDoc.data().fcmToken) {
-      console.log("No FCM token found for user", toUserId);
-      return null;
+    const db = getFirestore();
+    const messaging = getMessaging();
+
+    const recipientUserId = event.params.userId;
+    const fromUserName = reminder.fromUserName || "A friend";
+
+    // Fetch tokens for the recipient
+    const recipientDoc = await db.collection("users").doc(recipientUserId).get();
+    if (!recipientDoc.exists) {
+        console.warn(`Recipient user ${recipientUserId} not found in Firestore.`);
+        return;
     }
 
-    const fcmToken = userDoc.data().fcmToken;
+    const userData = recipientDoc.data();
+    const tokens = [];
+    if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+        tokens.push(...userData.fcmTokens);
+    } else if (userData.fcmToken) {
+        tokens.push(userData.fcmToken);
+    }
+
+    console.log(`Found ${tokens.length} tokens for recipient.`);
+
+    if (tokens.length === 0) return;
 
     const message = {
-      notification: {
-        title: "⏰ Settle Up Reminder",
-        body: reminder.message,
-      },
-      data: {
-        type: "reminder",
-        fromUserId: reminder.fromUserId
-      },
-      token: fcmToken,
+        notification: {
+            title: "⏰ Reminder",
+            body: reminder.message || `${fromUserName} is reminding you about a payment.`,
+        },
+        data: {
+            type: "reminder"
+        },
+        tokens: tokens,
     };
 
     try {
-      await admin.messaging().send(message);
-      console.log("Sent reminder notification to", toUserId);
+        const response = await messaging.sendEachForMulticast(message);
+        console.log(`Reminder result: Successfully sent ${response.successCount} messages; ${response.failureCount} errors.`);
     } catch (error) {
-      console.error("Error sending reminder:", error);
-      // Clean up token if invalid
-      if (
-        error.code === "messaging/invalid-registration-token" ||
-        error.code === "messaging/registration-token-not-registered"
-      ) {
-        await db.collection("users").doc(toUserId).update({
-          fcmToken: admin.firestore.FieldValue.delete()
-        });
-      }
+        console.error("Error sending message:", error);
     }
-
-    return null;
-  });
+});

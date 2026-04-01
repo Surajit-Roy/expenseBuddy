@@ -17,14 +17,17 @@ class NotificationCenterDelegate: NSObject, UNUserNotificationCenterDelegate {
     
     weak var notificationService: NotificationService?
     
-    /// When app is in foreground, suppress system banner (we show our own in-app banner instead).
+    /// When app is in foreground, print the payload and show a banner for debugging.
     func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
     ) {
-        // Don't show system banner in foreground — our in-app banner handles it
-        completionHandler([])
+        let userInfo = notification.request.content.userInfo
+        print("Notification Received (Foreground): \(userInfo)")
+        
+        // During debugging, we enable system banners in foreground to verify delivery
+        completionHandler([.banner, .sound, .list])
     }
     
     /// Handle taps on notifications (from background/lock screen).
@@ -34,6 +37,8 @@ class NotificationCenterDelegate: NSObject, UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         let userInfo = response.notification.request.content.userInfo
+        print("Notification Tapped: \(userInfo)")
+        
         if let expenseId = userInfo["expenseId"] as? String {
             Task { @MainActor [weak self] in
                 self?.notificationService?.navigateToExpense(expenseId)
@@ -106,55 +111,25 @@ class NotificationService: ObservableObject {
     /// Saves a device token string to Firestore for the authenticated user.
     func saveDeviceToken(_ tokenString: String) {
         guard let userId = Auth.auth().currentUser?.uid else { return }
-        db.collection("users").document(userId).updateData([
-            "fcmToken": tokenString
-        ]) { error in
+        print("NotificationService: Saving FCM token to Firestore — \(tokenString)")
+        db.collection("users").document(userId).setData([
+            "fcmTokens": FieldValue.arrayUnion([tokenString])
+        ], merge: true) { error in
             if let error = error {
                 print("NotificationService: Failed to save device token — \(error.localizedDescription)")
             }
         }
     }
     
-    /// Clears the device token from Firestore on logout.
-    func clearDeviceToken() {
+    /// Clears the current device token from Firestore on logout.
+    func clearDeviceToken(_ tokenString: String) {
         guard let userId = Auth.auth().currentUser?.uid else { return }
-        db.collection("users").document(userId).updateData([
-            "fcmToken": FieldValue.delete()
-        ])
+        db.collection("users").document(userId).setData([
+            "fcmTokens": FieldValue.arrayRemove([tokenString])
+        ], merge: true)
     }
     
     // MARK: - Notification Scheduling
-    
-    /// Schedules a notification for a new expense created by another user.
-    /// In foreground: shows only the in-app banner (no system notification).
-    /// In background: schedules a system UNNotification (banner + sound).
-    func scheduleExpenseNotification(expense: Expense, payerName: String) {
-        let title = "💰 New Expense Added"
-        let body = "\(payerName) added \"\(expense.title)\" for \(CurrencyManager.shared.format(expense.amount))"
-        
-        let isActive = UIApplication.shared.applicationState == .active
-        
-        if isActive {
-            // App is in foreground — show only the in-app banner (no system notification)
-            publishInAppNotification(title: title, body: body, expenseId: expense.id)
-        } else {
-            // App is in background or inactive — schedule a system notification
-            let content = UNMutableNotificationContent()
-            content.title = title
-            content.body = body
-            content.sound = .default
-            content.userInfo = ["expenseId": expense.id]
-            
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: 0.5, repeats: false)
-            let request = UNNotificationRequest(identifier: "expense_\(expense.id)", content: content, trigger: trigger)
-            
-            center.add(request) { error in
-                if let error = error {
-                    print("NotificationService: Failed to schedule notification — \(error.localizedDescription)")
-                }
-            }
-        }
-    }
     
     /// Sends a "Remind" notification to a friend who owes money.
     /// Creates a Firestore document in the friend's `reminders` subcollection

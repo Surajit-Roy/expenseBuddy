@@ -39,7 +39,6 @@ class AppDelegate: NSObject, UIApplicationDelegate, MessagingDelegate {
     // Receive FCM token
     func messaging(_ messaging: Messaging, didReceiveRegistrationToken fcmToken: String?) {
         if let token = fcmToken {
-            print("Firebase FCM Token received")
             notificationService?.saveDeviceToken(token)
         }
     }
@@ -86,25 +85,6 @@ struct ExpenseBuddyApp: App {
                             insertion: .move(edge: .leading).combined(with: .opacity),
                             removal: .move(edge: .trailing).combined(with: .opacity)
                         ))
-                }
-                
-                // In-app notification banner overlay
-                if let notification = notificationService.latestNotification {
-                    NotificationBannerView(
-                        notification: notification,
-                        onTap: {
-                            // Navigate to expense if available
-                            if let expenseId = notification.expenseId {
-                                notificationService.navigateToExpense(expenseId)
-                            }
-                            notificationService.dismissBanner()
-                        },
-                        onDismiss: {
-                            notificationService.dismissBanner()
-                        }
-                    )
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                    .zIndex(999)
                 }
             }
             .preferredColorScheme(isDarkMode ? .dark : .light)

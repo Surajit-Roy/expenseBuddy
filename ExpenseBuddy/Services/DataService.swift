@@ -177,11 +177,7 @@ class DataService: ObservableObject {
                                 guard !self.knownExpenseIds.contains(expense.id),
                                       expense.createdByUserId != userId else { continue }
                                 
-                                let payerName = self.userCache.name(for: expense.paidByUserId)
-                                self.notificationService?.scheduleExpenseNotification(
-                                    expense: expense,
-                                    payerName: payerName
-                                )
+
                             }
                         }
                         
@@ -284,17 +280,10 @@ class DataService: ObservableObject {
                     let newlyAdded = snapshot.documentChanges.filter { $0.type == .added }
                     for change in newlyAdded {
                         let data = change.document.data()
-                        if let message = data["message"] as? String,
-                           let fromUserId = data["fromUserId"] as? String,
+                        if let fromUserId = data["fromUserId"] as? String,
                            fromUserId != userId {
                             
-                            Task { @MainActor in
-                                self.notificationService?.publishInAppNotification(
-                                    title: "⏰ Reminder",
-                                    body: message,
-                                    expenseId: nil
-                                )
-                            }
+
                         }
                     }
                 }

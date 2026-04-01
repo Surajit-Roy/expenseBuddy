@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>1021118934579-d3cduplg4ml9mfs0vra70ga2lkr73eap.apps.googleusercontent.com</string>
+	<string>1021118934579-njtga3f33gl6vp3ahvhmnljriqshgs6o.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.1021118934579-d3cduplg4ml9mfs0vra70ga2lkr73eap</string>
+	<string>com.googleusercontent.apps.1021118934579-njtga3f33gl6vp3ahvhmnljriqshgs6o</string>
 	<key>API_KEY</key>
 	<string>AIzaSyBpFp5A7Cm4_SflRPblsLFd9RjPlAhc0VQ</string>
 	<key>GCM_SENDER_ID</key>
@@ -13,7 +13,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.surajitlearning.ExpenseBuddy</string>
+	<string>com.app.expensebuddy</string>
 	<key>PROJECT_ID</key>
 	<string>expencebuddy</string>
 	<key>STORAGE_BUCKET</key>
@@ -29,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1021118934579:ios:4e7b4a7c7f758394803d46</string>
+	<string>1:1021118934579:ios:a898c978f7f49a42803d46</string>
 </dict>
 </plist>

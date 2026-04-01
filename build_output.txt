@@ -1,2 +1,0 @@
-2026-03-17 17:23:23.751 xcodebuild[67005:503069] Writing error result bundle to /var/folders/2k/nvwnl7vn7ss8c7wbnrnf9tmw0000gp/T/ResultBundle_2026-17-03_17-23-0023.xcresult
-xcodebuild: error: 'ExpenseBuddy.xcworkspace' does not exist.
