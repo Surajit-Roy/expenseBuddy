@@ -42,11 +42,20 @@ exports.notifyOnExpenseCreated = onDocumentCreated({
     userDocs.forEach(doc => {
         if (doc.exists) {
             const userData = doc.data();
-            // Handle both new array format and legacy single string format
-            if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
-                tokens.push(...userData.fcmTokens);
-            } else if (userData.fcmToken) {
-                tokens.push(userData.fcmToken);
+            
+            // Check if notifications are enabled for this user
+            // Default to true if the field is missing (backward compatibility)
+            const notificationsEnabled = userData.notificationsEnabled !== false;
+            
+            if (notificationsEnabled) {
+                // Handle both new array format and legacy single string format
+                if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+                    tokens.push(...userData.fcmTokens);
+                } else if (userData.fcmToken) {
+                    tokens.push(userData.fcmToken);
+                }
+            } else {
+                console.log(`Skipping notifications for user ${doc.id} as they have disabled notifications.`);
             }
         } else {
             console.warn(`User document not found for ID: ${doc.id}`);
@@ -115,6 +124,14 @@ exports.notifyOnReminderCreated = onDocumentCreated({
     }
 
     const userData = recipientDoc.data();
+    
+    // Check if notifications are enabled for the recipient
+    const notificationsEnabled = userData.notificationsEnabled !== false;
+    if (!notificationsEnabled) {
+        console.log(`Recipient ${recipientUserId} has disabled notifications. Skipping.`);
+        return;
+    }
+
     const tokens = [];
     if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
         tokens.push(...userData.fcmTokens);

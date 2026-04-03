@@ -657,9 +657,27 @@ class DataService: ObservableObject {
             var updatedUser = currentUser
             updatedUser.hasAcceptedTerms = accepted
             currentUser = updatedUser
-            userCache.seed(currentUser)
+            userCache.seed(updatedUser)
         } catch {
             print("Error updating terms acceptance: \(error)")
+        }
+    }
+    
+    func updateNotificationPreference(enabled: Bool) async {
+        let userId = currentUser.id
+        guard !userId.isEmpty else { return }
+        
+        do {
+            try await db.collection("users").document(userId).updateData([
+                "notificationsEnabled": enabled
+            ])
+            
+            var updatedUser = currentUser
+            updatedUser.notificationsEnabled = enabled
+            currentUser = updatedUser
+            userCache.seed(updatedUser)
+        } catch {
+            print("Error updating notification preference: \(error)")
         }
     }
     

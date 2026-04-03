@@ -13,6 +13,7 @@ struct User: Identifiable, Codable, Hashable {
     var profileImage: String
     var fcmToken: String? = nil
     var hasAcceptedTerms: Bool = false
+    var notificationsEnabled: Bool = true
     var createdAt: Date
     
     var initials: String {
@@ -23,10 +24,10 @@ struct User: Identifiable, Codable, Hashable {
     }
     
     enum CodingKeys: String, CodingKey {
-        case id, name, email, mobileNumber, profileImage, fcmToken, hasAcceptedTerms, createdAt
+        case id, name, email, mobileNumber, profileImage, fcmToken, hasAcceptedTerms, notificationsEnabled, createdAt
     }
     
-    init(id: String, name: String, email: String, mobileNumber: String? = nil, profileImage: String, fcmToken: String? = nil, hasAcceptedTerms: Bool = false, createdAt: Date = Date()) {
+    init(id: String, name: String, email: String, mobileNumber: String? = nil, profileImage: String, fcmToken: String? = nil, hasAcceptedTerms: Bool = false, notificationsEnabled: Bool = true, createdAt: Date = Date()) {
         self.id = id
         self.name = name
         self.email = email
@@ -34,6 +35,7 @@ struct User: Identifiable, Codable, Hashable {
         self.profileImage = profileImage
         self.fcmToken = fcmToken
         self.hasAcceptedTerms = hasAcceptedTerms
+        self.notificationsEnabled = notificationsEnabled
         self.createdAt = createdAt
     }
     
@@ -46,6 +48,7 @@ struct User: Identifiable, Codable, Hashable {
         profileImage = try container.decodeIfPresent(String.self, forKey: .profileImage) ?? "person.circle.fill"
         fcmToken = try container.decodeIfPresent(String.self, forKey: .fcmToken)
         hasAcceptedTerms = try container.decodeIfPresent(Bool.self, forKey: .hasAcceptedTerms) ?? false
+        notificationsEnabled = try container.decodeIfPresent(Bool.self, forKey: .notificationsEnabled) ?? true
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
     }
     

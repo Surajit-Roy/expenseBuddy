@@ -21,13 +21,14 @@ struct ProfileView: View {
     @EnvironmentObject var dataService: DataService
     @EnvironmentObject var router: NavigationRouter
     @EnvironmentObject var premiumManager: PremiumManager
+    @EnvironmentObject var notificationService: NotificationService
     @State private var showLogoutAlert = false
     @State private var showDeleteProfileAlert = false
     @State private var showCannotDeleteProfileAlert = false
     @State private var showErrorAlert = false
     @AppStorage("isDarkMode") private var isDarkMode = false
     @AppStorage("currencySymbol") private var currencySymbol = "₹"
-    @AppStorage("notificationsEnabled") private var notificationsEnabled = true
+    @State private var notificationsEnabled = true
     
     var body: some View {
         NavigationStack(path: $router.profilePath) {
@@ -112,6 +113,19 @@ struct ProfileView: View {
             } message: {
                 Text(authService.errorMessage ?? "An unknown error occurred.")
             }
+            .onAppear {
+                syncNotificationToggle()
+            }
+            .onChange(of: dataService.currentUser) { _ in
+                syncNotificationToggle()
+            }
+        }
+    }
+    
+    private func syncNotificationToggle() {
+        // Only sync if they are different to avoid unnecessary triggers
+        if notificationsEnabled != dataService.currentUser.notificationsEnabled {
+            notificationsEnabled = dataService.currentUser.notificationsEnabled
         }
     }
     
@@ -230,9 +244,55 @@ struct ProfileView: View {
                 Toggle("", isOn: $notificationsEnabled)
                     .labelsHidden()
                     .tint(AppColors.primary)
+                    .onChange(of: notificationsEnabled) { newValue in
+                        Task {
+                            await dataService.updateNotificationPreference(enabled: newValue)
+                        }
+                    }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
+            
+            // System Notification Permission Warning
+            if notificationsEnabled && !notificationService.isPermissionGranted {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .symbolRenderingMode(.multicolor)
+                            .font(.system(size: 16, weight: .semibold))
+                        
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Notifications are disabled in Settings.")
+                                .font(AppFonts.subheadline().weight(.medium))
+                                .foregroundColor(AppColors.textPrimary)
+                            Text("You won't receive push alerts until enabled.")
+                                .font(AppFonts.caption())
+                                .foregroundColor(AppColors.textSecondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }) {
+                            Text("Enable")
+                                .font(AppFonts.caption().bold())
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(AppColors.primary)
+                                .cornerRadius(8)
+                        }
+                    }
+                }
+                .padding(12)
+                .background(AppColors.oweRed.opacity(0.05))
+                .cornerRadius(12)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 14)
+            }
             
             Divider().padding(.leading, 52)
             
